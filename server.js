@@ -92,7 +92,7 @@ app.delete('/api/staff/:id', (req, res) => {
 app.get('/api/events/:id/assignments', (req, res) => {
   const sql = `
     SELECT sa.id, sa.eventId, sa.staffId, 
-           s.fullName, s.phone, s.email, s.role
+           s.fullName, s.phone, s.role
     FROM staff_assignments sa
     JOIN staff s ON s.id = sa.staffId
     WHERE sa.eventId = ?
@@ -103,13 +103,12 @@ app.get('/api/events/:id/assignments', (req, res) => {
       id: row.id,
       eventId: row.eventId,
       staffId: row.staffId,
-      staff: {
-        id: row.staffId,
-        fullName: row.fullName,
-        phone: row.phone,
-        email: row.email,
-        role: row.role
-      }
+        staff: {
+          id: row.staffId,
+          fullName: row.fullName,
+          phone: row.phone,
+          role: row.role
+        }
     }));
     res.json({ assignments });
   });
@@ -185,7 +184,6 @@ app.get('/api/events', (req, res) => {
               id: s.id,
               fullName: s.fullName,
               phone: s.phone,
-              email: s.email,
               role: s.role
             }));
           }
