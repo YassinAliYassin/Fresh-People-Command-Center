@@ -58,3 +58,14 @@ export interface ActivityLog {
   message: string;
   isUrgent?: boolean;
 }
+
+export interface BackendEvent {
+  id: string;
+  title: string;
+  date: string;
+  duration: number;
+  staff_assigned: string;
+  dress_code: string;
+  arrival_time: string;
+  created_at?: string;
+}

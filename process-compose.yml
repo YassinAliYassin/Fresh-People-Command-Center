@@ -1,0 +1,15 @@
+version: "0.5"
+
+processes:
+  postgres:
+    command: "postgres -D ./.nix-db -k /tmp"
+    availability:
+      restart: always
+
+  app:
+    command: "pnpm dev"
+    environment:
+      - PORT=3000
+    depends_on:
+      postgres:
+        condition: process_healthy
