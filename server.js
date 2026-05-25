@@ -51,11 +51,11 @@ app.get('/api/staff', (req, res) => {
 
 // CREATE staff
 app.post('/api/staff', (req, res) => {
-  const { fullName, phone, email, role, rate } = req.body;
+  const { fullName, phone, role, rate } = req.body;
   if (!fullName) return res.status(400).json({ error: 'fullName required' });
   
-  const sql = `INSERT INTO staff (fullName, phone, email, role, rate) VALUES (?, ?, ?, ?, ?)`;
-  db.run(sql, [fullName, phone || '', email || '', role || '', rate || 0], function(err) {
+  const sql = `INSERT INTO staff (fullName, phone, role, rate) VALUES (?, ?, ?, ?)`;
+  db.run(sql, [fullName, phone || '', role || '', rate || 0], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.status(201).json({ id: this.lastID, message: 'Staff created' });
   });
@@ -63,9 +63,9 @@ app.post('/api/staff', (req, res) => {
 
 // UPDATE staff
 app.put('/api/staff/:id', (req, res) => {
-  const { fullName, phone, email, role, rate } = req.body;
-  const sql = `UPDATE staff SET fullName = ?, phone = ?, email = ?, role = ?, rate = ? WHERE id = ?`;
-  db.run(sql, [fullName, phone || '', email || '', role || '', rate || 0, req.params.id], function(err) {
+  const { fullName, phone, role, rate } = req.body;
+  const sql = `UPDATE staff SET fullName = ?, phone = ?, role = ?, rate = ? WHERE id = ?`;
+  db.run(sql, [fullName, phone || '', role || '', rate || 0, req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ message: 'Staff updated', changes: this.changes });
   });

@@ -12,9 +12,9 @@ const EventCard: React.FC<EventCardProps> = ({ event, onDelete }) => {
   const formatTime = (dateStr: string) => new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   // Check if we have any contact info to show actions
-  const hasContactInfo = (event.assignedStaff && event.assignedStaff.length > 0) || event.staffName || event.clientName || event.clientEmail || event.clientPhone;
+  const hasContactInfo = (event.assignedStaff && event.assignedStaff.length > 0) || event.staffName || event.clientName || event.clientPhone;
   const hasWhatsApp = event.staffPhone || (event.assignedStaff && event.assignedStaff.some(s => s.phone)) || event.clientPhone;
-  const hasEmail = event.staffEmail || (event.assignedStaff && event.assignedStaff.some(s => s.email)) || event.clientEmail;
+  const hasEmail = event.clientEmail; // Only client email for now
 
   // Get primary contact for WhatsApp/Email (first assigned staff or legacy)
   const getPrimaryContact = () => {
@@ -36,10 +36,9 @@ const EventCard: React.FC<EventCardProps> = ({ event, onDelete }) => {
 
   // Generate Email link
   const getEmailLink = () => {
-    const primary = getPrimaryContact();
-    const email = primary?.email || event.staffEmail || event.clientEmail;
+    const email = event.clientEmail; // Staff communication via WhatsApp only
     if (!email) return '#';
-    const name = primary?.fullName || event.staffName || event.clientName || '';
+    const name = event.staffName || event.clientName || '';
     const subject = `Event Details: ${event.title}`;
     const body = `Hi ${name}, checking in on ${event.title} scheduled for ${formatDate(event.date)}`;
     return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;

@@ -21,17 +21,6 @@ export interface Venue {
   notes: string;
 }
 
-export interface Staff {
-  id: string;
-  name: string;
-  surname: string;
-  role: string;
-  rate: number;
-  phone: string;
-  email: string;
-  notes: string;
-}
-
 export interface Event {
   id: string;
   title: string;
@@ -63,7 +52,6 @@ export interface Staff {
   id: number;
   fullName: string;
   phone: string;
-  email: string;
   role?: string;
   rate?: number;
 }
