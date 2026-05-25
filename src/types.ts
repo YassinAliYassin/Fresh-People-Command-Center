@@ -59,19 +59,36 @@ export interface ActivityLog {
   isUrgent?: boolean;
 }
 
+export interface Staff {
+  id: number;
+  fullName: string;
+  phone: string;
+  email: string;
+  role?: string;
+  rate?: number;
+}
+
+export interface StaffAssignment {
+  id: number;
+  eventId: string;
+  staffId: number;
+  staff?: Staff;  // Populated when joining
+}
+
 export interface BackendEvent {
   id: string;
   title: string;
   date: string;
   duration: number;
-  staffName: string;  // Full name (Firstname Surname)
+  staffName?: string;  // Legacy single-assignment (for migration)
   staffPhone?: string;
   staffEmail?: string;
-  clientName?: string;  // Full name (Firstname Surname)
+  assignedStaff?: Staff[];  // New many-to-many roster
+  clientName?: string;
   clientPhone?: string;
   clientEmail?: string;
   dressCode: string;
-  uniformType?: string;  // Uniform type for staff
+  uniformType?: string;
   arrivalTime: string;
   createdAt?: string;
 }

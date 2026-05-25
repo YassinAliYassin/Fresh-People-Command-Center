@@ -17,3 +17,6 @@ add-*-column.js
 # Temp migration scripts
 add-*.js
 rename-*.js
+
+# Temp scripts
+create-*.js

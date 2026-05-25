@@ -37,30 +37,166 @@ app.post('/api/events', (req, res) => {
   });
 });
 
-// READ all events
+// ==================
+// STAFF ENDPOINTS
+// ==================
+
+// GET all staff
+app.get('/api/staff', (req, res) => {
+  db.all('SELECT * FROM staff ORDER BY fullName', [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ staff: rows });
+  });
+});
+
+// CREATE staff
+app.post('/api/staff', (req, res) => {
+  const { fullName, phone, email, role, rate } = req.body;
+  if (!fullName) return res.status(400).json({ error: 'fullName required' });
+  
+  const sql = `INSERT INTO staff (fullName, phone, email, role, rate) VALUES (?, ?, ?, ?, ?)`;
+  db.run(sql, [fullName, phone || '', email || '', role || '', rate || 0], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.status(201).json({ id: this.lastID, message: 'Staff created' });
+  });
+});
+
+// UPDATE staff
+app.put('/api/staff/:id', (req, res) => {
+  const { fullName, phone, email, role, rate } = req.body;
+  const sql = `UPDATE staff SET fullName = ?, phone = ?, email = ?, role = ?, rate = ? WHERE id = ?`;
+  db.run(sql, [fullName, phone || '', email || '', role || '', rate || 0, req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: 'Staff updated', changes: this.changes });
+  });
+});
+
+// DELETE staff
+app.delete('/api/staff/:id', (req, res) => {
+  // First remove any assignments
+  db.run('DELETE FROM staff_assignments WHERE staffId = ?', [req.params.id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    
+    db.run('DELETE FROM staff WHERE id = ?', [req.params.id], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ message: 'Staff deleted', changes: this.changes });
+    });
+  });
+});
+
+// ==================
+// ASSIGNMENT ENDPOINTS
+// ==================
+
+// GET event assignments with staff details
+app.get('/api/events/:id/assignments', (req, res) => {
+  const sql = `
+    SELECT sa.id, sa.eventId, sa.staffId, 
+           s.fullName, s.phone, s.email, s.role
+    FROM staff_assignments sa
+    JOIN staff s ON s.id = sa.staffId
+    WHERE sa.eventId = ?
+  `;
+  db.all(sql, [req.params.id], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const assignments = rows.map(row => ({
+      id: row.id,
+      eventId: row.eventId,
+      staffId: row.staffId,
+      staff: {
+        id: row.staffId,
+        fullName: row.fullName,
+        phone: row.phone,
+        email: row.email,
+        role: row.role
+      }
+    }));
+    res.json({ assignments });
+  });
+});
+
+// ASSIGN staff to event
+app.post('/api/events/:id/assignments', (req, res) => {
+  const { staffId } = req.body;
+  if (!staffId) return res.status(400).json({ error: 'staffId required' });
+  
+  // Check if already assigned
+  db.get('SELECT id FROM staff_assignments WHERE eventId = ? AND staffId = ?', 
+    [req.params.id, staffId], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (row) return res.status(400).json({ error: 'Staff already assigned to this event' });
+    
+    db.run('INSERT INTO staff_assignments (eventId, staffId) VALUES (?, ?)', 
+      [req.params.id, staffId], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.status(201).json({ id: this.lastID, message: 'Staff assigned' });
+    });
+  });
+});
+
+// REMOVE staff assignment
+app.delete('/api/events/:eventId/assignments/:staffId', (req, res) => {
+  db.run('DELETE FROM staff_assignments WHERE eventId = ? AND staffId = ?',
+    [req.params.eventId, req.params.staffId], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: 'Staff unassigned', changes: this.changes });
+  });
+});
+
+// ==================
+// EVENTS ENDPOINTS (Updated to include assignments)
+// ==================
+
+// READ all events (with assigned staff)
 app.get('/api/events', (req, res) => {
   db.all(`SELECT * FROM events ORDER BY date DESC`, [], (err, rows) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
-    // Map DB rows to camelCase for frontend
-    const events = rows.map(row => ({
-      id: row.id,
-      title: row.title,
-      date: row.date,
-      duration: row.duration,
-      staffName: row.staffName,
-      staffPhone: row.staffPhone,
-      staffEmail: row.staffEmail,
-      clientName: row.clientName,
-      clientPhone: row.clientPhone,
-      clientEmail: row.clientEmail,
-      dressCode: row.dressCode,
-      uniformType: row.uniform_type,
-      arrivalTime: row.arrivalTime,
-      createdAt: row.created_at
-    }));
-    res.json({ events });
+    // For each event, fetch assignments
+    const eventPromises = rows.map(row => {
+      return new Promise((resolve) => {
+        const event = {
+          id: row.id,
+          title: row.title,
+          date: row.date,
+          duration: row.duration,
+          staffName: row.staffName,
+          staffPhone: row.staffPhone,
+          staffEmail: row.staffEmail,
+          clientName: row.clientName,
+          clientPhone: row.clientPhone,
+          clientEmail: row.clientEmail,
+          dressCode: row.dressCode,
+          uniformType: row.uniformType,
+          arrivalTime: row.arrivalTime,
+          createdAt: row.created_at
+        };
+        
+        // Fetch assigned staff
+        const sql = `
+          SELECT s.* FROM staff s
+          JOIN staff_assignments sa ON s.id = sa.staffId
+          WHERE sa.eventId = ?
+        `;
+        db.all(sql, [row.id], (err, staffRows) => {
+          if (!err && staffRows.length > 0) {
+            event.assignedStaff = staffRows.map(s => ({
+              id: s.id,
+              fullName: s.fullName,
+              phone: s.phone,
+              email: s.email,
+              role: s.role
+            }));
+          }
+          resolve(event);
+        });
+      });
+    });
+    
+    Promise.all(eventPromises).then(events => {
+      res.json({ events });
+    });
   });
 });
 

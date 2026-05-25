@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, User, Shirt, Clock, Trash2, Mail, MessageCircle } from 'lucide-react';
+import { Calendar, User, Shirt, Clock, Trash2, Mail, MessageCircle, Users } from 'lucide-react';
 import { BackendEvent } from '../types';
 
 interface EventCardProps {
@@ -12,25 +12,36 @@ const EventCard: React.FC<EventCardProps> = ({ event, onDelete }) => {
   const formatTime = (dateStr: string) => new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   // Check if we have any contact info to show actions
-  const hasContactInfo = event.staffName || event.clientName || event.clientEmail || event.clientPhone;
-  const hasWhatsApp = event.staffPhone || event.clientPhone;
-  const hasEmail = event.staffEmail || event.clientEmail;
+  const hasContactInfo = (event.assignedStaff && event.assignedStaff.length > 0) || event.staffName || event.clientName || event.clientEmail || event.clientPhone;
+  const hasWhatsApp = event.staffPhone || (event.assignedStaff && event.assignedStaff.some(s => s.phone)) || event.clientPhone;
+  const hasEmail = event.staffEmail || (event.assignedStaff && event.assignedStaff.some(s => s.email)) || event.clientEmail;
+
+  // Get primary contact for WhatsApp/Email (first assigned staff or legacy)
+  const getPrimaryContact = () => {
+    if (event.assignedStaff && event.assignedStaff.length > 0) {
+      return event.assignedStaff[0];
+    }
+    return null;
+  };
 
   // Generate WhatsApp link
   const getWhatsAppLink = () => {
-    const phone = event.staffPhone || event.clientPhone;
+    const primary = getPrimaryContact();
+    const phone = primary?.phone || event.staffPhone || event.clientPhone;
     if (!phone) return '#';
-    const fullName = event.staffName || event.clientName || 'there';
-    const text = `Hello ${fullName}, regarding the ${event.title} on ${formatDate(event.date)}`;
+    const name = primary?.fullName || event.staffName || event.clientName || 'there';
+    const text = `Hello ${name}, regarding the ${event.title} on ${formatDate(event.date)}`;
     return `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`;
   };
 
   // Generate Email link
   const getEmailLink = () => {
-    const email = event.staffEmail || event.clientEmail;
+    const primary = getPrimaryContact();
+    const email = primary?.email || event.staffEmail || event.clientEmail;
     if (!email) return '#';
+    const name = primary?.fullName || event.staffName || event.clientName || '';
     const subject = `Event Details: ${event.title}`;
-    const body = `Hi ${event.staffName || event.clientName || ''}, checking in on ${event.title} scheduled for ${formatDate(event.date)}`;
+    const body = `Hi ${name}, checking in on ${event.title} scheduled for ${formatDate(event.date)}`;
     return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
@@ -70,15 +81,41 @@ const EventCard: React.FC<EventCardProps> = ({ event, onDelete }) => {
           <Calendar className="w-3 h-3" />
           {formatDate(event.date)}
         </div>
-        <div className="flex items-center gap-1">
-          <User className="w-3 h-3" />
-          {event.staffName || 'Unassigned'}
-        </div>
+        
+        {/* Staff Roster */}
+        {event.assignedStaff && event.assignedStaff.length > 0 ? (
+          <div className="flex items-start gap-1">
+            <Users className="w-3 h-3 mt-0.5" />
+            <div>
+              <p className="font-medium text-gray-300">Staff Roster ({event.assignedStaff.length})</p>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {event.assignedStaff.map(staff => (
+                  <span key={staff.id} className="text-xs bg-gray-700 px-2 py-1 rounded">
+                    {staff.fullName}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : event.staffName ? (
+          <div className="flex items-center gap-1">
+            <User className="w-3 h-3" />
+            {event.staffName} (legacy)
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 text-gray-500">
+            <User className="w-3 h-3" />
+            Unassigned
+          </div>
+        )}
+        
         {event.clientName && (
           <div className="flex items-center gap-1 text-xs text-gray-500">
+            <User className="w-3 h-3" />
             Client: {event.clientName}
           </div>
         )}
+        
         <div className="flex items-center gap-1">
           <Shirt className="w-3 h-3" />
           {event.dressCode}

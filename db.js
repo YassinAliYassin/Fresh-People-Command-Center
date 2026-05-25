@@ -16,21 +16,55 @@ const db = new sqlite3.Database(dbPath, (err) => {
       title TEXT NOT NULL,
       date TEXT NOT NULL,
       duration INTEGER DEFAULT 4,
-      staff_assigned TEXT,
-      staff_phone TEXT DEFAULT '',
-      staff_email TEXT DEFAULT '',
+      staffName TEXT,
+      staffPhone TEXT DEFAULT '',
+      staffEmail TEXT DEFAULT '',
       clientName TEXT DEFAULT '',
       clientPhone TEXT DEFAULT '',
       clientEmail TEXT DEFAULT '',
-      dress_code TEXT DEFAULT 'All Black',
-      uniform_type TEXT DEFAULT 'Formal All Black',
-      arrival_time TEXT,
+      dressCode TEXT DEFAULT 'All Black',
+      uniformType TEXT DEFAULT 'Formal All Black',
+      arrivalTime TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`, (err) => {
       if (err) {
         console.error('Error creating events table', err);
       } else {
         console.log('Events table ready');
+      }
+    });
+    
+    // Create staff table
+    db.run(`CREATE TABLE IF NOT EXISTS staff (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      fullName TEXT NOT NULL,
+      phone TEXT DEFAULT '',
+      email TEXT DEFAULT '',
+      role TEXT DEFAULT '',
+      rate REAL DEFAULT 0,
+      notes TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`, (err) => {
+      if (err) {
+        console.error('Error creating staff table', err);
+      } else {
+        console.log('Staff table ready');
+      }
+    });
+    
+    // Create staff_assignments table
+    db.run(`CREATE TABLE IF NOT EXISTS staff_assignments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      eventId TEXT NOT NULL,
+      staffId INTEGER NOT NULL,
+      assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(eventId) REFERENCES events(id),
+      FOREIGN KEY(staffId) REFERENCES staff(id)
+    )`, (err) => {
+      if (err) {
+        console.error('Error creating staff_assignments table', err);
+      } else {
+        console.log('Staff_assignments table ready');
       }
     });
   }
