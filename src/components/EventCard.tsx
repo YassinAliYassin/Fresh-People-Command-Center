@@ -90,21 +90,21 @@ const EventCard: React.FC<EventCardProps> = ({ event, onDelete }) => {
           <a
             href={getWhatsAppLink()}
             onClick={handleWhatsAppClick}
-            className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 transition-colors p-1 -m-1"
+            className="flex items-center gap-2 text-sm text-green-400 hover:text-green-300 transition-colors p-2 -m-2 min-h-[44px] min-w-[44px] justify-center"
             title="Contact via WhatsApp"
             target="_blank"
             rel="noopener noreferrer"
           >
-            <MessageCircle className="w-4 h-4" />
+            <MessageCircle className="w-5 h-5" />
             <span className="hidden sm:inline">WhatsApp</span>
           </a>
           <a
             href={getEmailLink()}
             onClick={handleEmailClick}
-            className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors p-1 -m-1"
+            className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 transition-colors p-2 -m-2 min-h-[44px] min-w-[44px] justify-center"
             title="Contact via Email"
           >
-            <Mail className="w-4 h-4" />
+            <Mail className="w-5 h-5" />
             <span className="hidden sm:inline">Email</span>
           </a>
         </div>

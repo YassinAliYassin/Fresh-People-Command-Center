@@ -13,8 +13,8 @@ app.use(cors());
 
 // CREATE event
 app.post('/api/events', (req, res) => {
-  const { id, title, date, duration, staff_assigned, dress_code, arrival_time } = req.body;
-  const sql = `INSERT INTO events (id, title, date, duration, staff_assigned, dress_code, arrival_time) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+  const { id, title, date, duration, staff_assigned, dress_code, arrival_time, staff_phone, staff_email, client_phone, client_email } = req.body;
+  const sql = `INSERT INTO events (id, title, date, duration, staff_assigned, dress_code, arrival_time, staff_phone, staff_email, client_phone, client_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   db.run(sql, [
     id,
     title,
@@ -22,7 +22,11 @@ app.post('/api/events', (req, res) => {
     duration || 4,
     staff_assigned,
     dress_code || 'All Black',
-    arrival_time
+    arrival_time,
+    staff_phone || '',
+    staff_email || '',
+    client_phone || '',
+    client_email || ''
   ], function(err) {
     if (err) {
       return res.status(500).json({ error: err.message });
@@ -43,8 +47,8 @@ app.get('/api/events', (req, res) => {
 
 // UPDATE event
 app.put('/api/events/:id', (req, res) => {
-  const { title, date, duration, staff_assigned, dress_code, arrival_time } = req.body;
-  const sql = `UPDATE events SET title = ?, date = ?, duration = ?, staff_assigned = ?, dress_code = ?, arrival_time = ? WHERE id = ?`;
+  const { title, date, duration, staff_assigned, dress_code, arrival_time, staff_phone, staff_email, client_phone, client_email } = req.body;
+  const sql = `UPDATE events SET title = ?, date = ?, duration = ?, staff_assigned = ?, dress_code = ?, arrival_time = ?, staff_phone = ?, staff_email = ?, client_phone = ?, client_email = ? WHERE id = ?`;
   db.run(sql, [
     title,
     date,
@@ -52,6 +56,10 @@ app.put('/api/events/:id', (req, res) => {
     staff_assigned,
     dress_code,
     arrival_time,
+    staff_phone || '',
+    staff_email || '',
+    client_phone || '',
+    client_email || '',
     req.params.id
   ], function(err) {
     if (err) {
