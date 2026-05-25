@@ -83,6 +83,11 @@ const EventCard: React.FC<EventCardProps> = ({ event, onDelete }) => {
           <Shirt className="w-3 h-3" />
           {event.dressCode}
         </div>
+        {event.uniformType && (
+          <div className="flex items-center gap-1 text-xs text-gray-500">
+            Uniform: {event.uniformType}
+          </div>
+        )}
         <div className="flex items-center gap-1">
           <Clock className="w-3 h-3" />
           {event.duration}hr (Arrive: {formatTime(event.arrivalTime)})

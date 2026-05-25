@@ -71,6 +71,7 @@ export interface BackendEvent {
   clientPhone?: string;
   clientEmail?: string;
   dressCode: string;
+  uniformType?: string;  // Uniform type for staff
   arrivalTime: string;
   createdAt?: string;
 }

@@ -13,8 +13,8 @@ app.use(cors());
 
 // CREATE event
 app.post('/api/events', (req, res) => {
-  const { id, title, date, duration, staffName, dressCode, arrivalTime, staffPhone, staffEmail, clientName, clientPhone, clientEmail } = req.body;
-  const sql = `INSERT INTO events (id, title, date, duration, staff_assigned, dress_code, arrival_time, staff_phone, staff_email, clientName, clientPhone, clientEmail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  const { id, title, date, duration, staffName, dressCode, uniformType, arrivalTime, staffPhone, staffEmail, clientName, clientPhone, clientEmail } = req.body;
+  const sql = `INSERT INTO events (id, title, date, duration, staff_assigned, dress_code, uniform_type, arrival_time, staff_phone, staff_email, clientName, clientPhone, clientEmail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   db.run(sql, [
     id,
     title,
@@ -22,6 +22,7 @@ app.post('/api/events', (req, res) => {
     duration || 4,
     staffName || '',
     dressCode || 'All Black',
+    uniformType || 'Formal All Black',
     arrivalTime || '',
     staffPhone || '',
     staffEmail || '',
@@ -47,6 +48,7 @@ app.get('/api/events', (req, res) => {
     clientPhone,
     clientEmail,
     dress_code as dressCode, 
+    uniform_type as uniformType,
     arrival_time as arrivalTime, 
     created_at as createdAt
   FROM events ORDER BY date DESC`, [], (err, rows) => {
