@@ -1,11 +1,8 @@
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
-import { Calendar, Users, Building, DollarSign } from 'lucide-react';
+import { Calendar, Users } from 'lucide-react';
 import EventForm from './components/EventForm';
 import EventList from './components/EventList';
-import CalendarView from './components/CalendarView';
-import ClientsView from './components/ClientsView';
-import PayrollSummary from './components/PayrollSummary';
 
 // Persistent Navigation - Fixed bottom on mobile, top on desktop
 const Navbar = () => {
@@ -26,20 +23,6 @@ const Navbar = () => {
           >
             <Calendar size={20} />
             <span className="text-xs sm:text-sm">Calendar</span>
-          </Link>
-          <Link
-            to="/clients"
-            className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
-          >
-            <Building size={20} />
-            <span className="text-xs sm:text-sm">Clients</span>
-          </Link>
-          <Link
-            to="/payroll"
-            className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
-          >
-            <DollarSign size={20} />
-            <span className="text-xs sm:text-sm">Payroll</span>
           </Link>
         </div>
       </div>
@@ -74,13 +57,6 @@ const App: React.FC = () => {
             <h1 className="font-display tracking-[0.2em] font-bold text-lg md:text-xl">
               FRESH PEOPLE
             </h1>
-            <span className="hidden md:inline h-4 w-[1px] bg-gray-700"></span>
-            <span className="hidden md:inline font-mono text-[10px] text-blue-400 uppercase tracking-widest">
-              Command Center
-            </span>
-          </div>
-          <div className="font-mono text-[10px] text-gray-400">
-            {new Date().toLocaleDateString()}
           </div>
         </div>
       </header>
@@ -92,9 +68,7 @@ const App: React.FC = () => {
       <main className="min-h-screen pb-16 sm:pb-0 overflow-y-auto">
         <Routes>
           <Route path="/events" element={<EventManagement />} />
-          <Route path="/calendar" element={<CalendarView />} />
-          <Route path="/clients" element={<ClientsView />} />
-          <Route path="/payroll" element={<PayrollSummary />} />
+          <Route path="/calendar" element={<div>Calendar Page</div>} />
           <Route path="*" element={<Navigate to="/events" replace />} />
         </Routes>
       </main>
