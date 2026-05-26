@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Event Report - Fresh People</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #333; }
+    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 20px; }
+    .header h1 { font-size: 28px; margin-bottom: 5px; }
+    .header p { color: #666; }
+    .section { margin: 20px 0; }
+    .section h2 { font-size: 18px; margin-bottom: 10px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+    .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 15px 0; }
+    .info-item { padding: 8px; background: #f5f5f5; border-radius: 4px; }
+    .info-label { font-size: 12px; color: #666; }
+    .info-value { font-weight: bold; margin-top: 2px; }
+    table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background: #f5f5f5; font-weight: 600; }
+    .total-row { font-weight: bold; background: #f9f9f9; }
+    .profit-positive { color: #16a34a; }
+    .profit-negative { color: #dc2626; }
+    .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #666; }
+    @media print {
+      body { padding: 20px; }
+      button { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="report">
+    <div class="header">
+      <h1>Fresh People Events</h1>
+      <p>Event Report</p>
+    </div>
+    
+    <div id="content">Loading...</div>
+    
+    <div class="footer">
+      <p>Generated on <span id="timestamp"></span></p>
+    </div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const eventId = urlParams.get('eventId');
+    const apiBase = `${window.location.protocol}//${window.location.hostname}:3001`;
+
+    document.getElementById('timestamp').textContent = new Date().toLocaleString();
+
+    if (!eventId) {
+      document.getElementById('content').innerHTML = '<p>No event ID provided</p>';
+    } else {
+      fetch(`${apiBase}/api/events`)
+        .then(res => res.json())
+        .then(data => {
+          const event = data.events?.find(e => e.id === eventId);
+          if (!event) {
+            document.getElementById('content').innerHTML = '<p>Event not found</p>';
+            return;
+          }
+          renderReport(event);
+        })
+        .catch(err => {
+          document.getElementById('content').innerHTML = `<p>Error: ${err.message}</p>`;
+        });
+    }
+
+    function renderReport(event) {
+      const staffPayroll = event.assignedStaff?.reduce((sum, s) => sum + (s.earnedAmount || 0), 0) || 0;
+      const miscTotal = event.miscExpenses?.reduce((sum, e) => sum + e.amount, 0) || 0;
+      const totalCost = staffPayroll + miscTotal;
+      const profit = (event.clientBudget || 0) - totalCost;
+
+      let html = `
+        <div class="section">
+          <h2>${event.title}</h2>
+          <div class="info-grid">
+            <div class="info-item">
+              <div class="info-label">Date</div>
+              <div class="info-value">${new Date(event.date).toLocaleDateString()}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Duration</div>
+              <div class="info-value">${event.duration} hours</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Client</div>
+              <div class="info-value">${event.clientName || 'N/A'}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Budget</div>
+              <div class="info-value">R${(event.clientBudget || 0).toFixed(2)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Staff Roster</h2>
+          ${event.assignedStaff?.length > 0 ? `
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Role</th>
+                  <th>Shift</th>
+                  <th>Hours</th>
+                  <th>Earned</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${event.assignedStaff.map(s => `
+                  <tr>
+                    <td>${s.fullName}</td>
+                    <td>${s.role}</td>
+                    <td>${s.shiftType || 'Full Shift'}</td>
+                    <td>${s.totalHours || 0}hrs</td>
+                    <td>R${(s.earnedAmount || 0).toFixed(2)}</td>
+                    <td>${s.status || 'Pending'}</td>
+                  </tr>
+                `).join('')}
+                <tr class="total-row">
+                  <td colspan="4">Total Payroll</td>
+                  <td colspan="2">R${staffPayroll.toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          ` : '<p>No staff assigned</p>'}
+        </div>
+
+        <div class="section">
+          <h2>Miscellaneous Expenses</h2>
+          ${event.miscExpenses?.length > 0 ? `
+            <table>
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Description</th>
+                  <th>Date</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${event.miscExpenses.map(e => `
+                  <tr>
+                    <td>${e.category}</td>
+                    <td>${e.description}</td>
+                    <td>${new Date(e.date).toLocaleDateString()}</td>
+                    <td>R${e.amount.toFixed(2)}</td>
+                  </tr>
+                `).join('')}
+                <tr class="total-row">
+                  <td colspan="3">Total Expenses</td>
+                  <td>R${miscTotal.toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          ` : '<p>No expenses recorded</p>'}
+        </div>
+
+        <div class="section">
+          <h2>Financial Summary</h2>
+          <table>
+            <tr>
+              <td>Client Budget</td>
+              <td>R${(event.clientBudget || 0).toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td>Staff Payroll</td>
+              <td>R${staffPayroll.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td>Misc Expenses</td>
+              <td>R${miscTotal.toFixed(2)}</td>
+            </tr>
+            <tr class="total-row">
+              <td>Total Cost</td>
+              <td>R${totalCost.toFixed(2)}</td>
+            </tr>
+            <tr class="total-row ${profit >= 0 ? 'profit-positive' : 'profit-negative'}">
+              <td><strong>Net Profit</strong></td>
+              <td><strong>R${profit.toFixed(2)}</strong></td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+          <button onclick="window.print()" style="padding: 10px 30px; background: #000; color: #fff; border: none; border-radius: 4px; cursor: pointer;">
+            Print Report
+          </button>
+        </div>
+      `;
+
+      document.getElementById('content').innerHTML = html;
+    }
+  </script>
+</body>
+</html>

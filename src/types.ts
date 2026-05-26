@@ -4,12 +4,11 @@
  */
 
 export interface Client {
-  id: string;
+  id: number;
   name: string;
-  contact: string;
+  contactPerson: string;
   email: string;
   phone: string;
-  notes: string;
 }
 
 export interface Venue {
@@ -89,13 +88,17 @@ export interface BackendEvent {
   staffName?: string;  // Legacy single-assignment (for migration)
   staffPhone?: string;
   staffEmail?: string;
-  assignedStaff?: StaffAssignment[];  // New many-to-many roster with shift type
-  clientName?: string;
+  assignedStaff?: StaffAssignment[];  // Many-to-many roster with shift type
+  clientId?: number;  // Foreign key to clients table
+  clientName?: string;  // Populated from join
+  clientBudget?: number;  // Budget allocated by client
   clientPhone?: string;
   clientEmail?: string;
   dressCode: string;
   uniformType?: string;
   arrivalTime: string;
   miscExpenses?: MiscExpense[];  // Miscellaneous expenses for tax reporting
+  totalEventCost?: number;  // Calculated: staff payroll + expenses
+  netProfit?: number;  // Calculated: clientBudget - totalEventCost
   createdAt?: string;
 }

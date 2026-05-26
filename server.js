@@ -10,11 +10,12 @@ const port = process.env.PORT || 3001;
 
 app.use(express.json());
 app.use(cors());
+app.use(express.static('public')); // Serve static files
 
 // CREATE event
 app.post('/api/events', (req, res) => {
-  const { id, title, date, duration, staffName, dressCode, uniformType, arrivalTime, staffPhone, staffEmail, clientName, clientPhone, clientEmail, miscExpenses } = req.body;
-  const sql = `INSERT INTO events (id, title, date, duration, staffName, dressCode, uniformType, arrivalTime, staffPhone, staffEmail, clientName, clientPhone, clientEmail, misc_expenses) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  const { id, title, date, duration, staffName, dressCode, uniformType, arrivalTime, staffPhone, staffEmail, clientID, clientBudget, clientName, clientPhone, clientEmail, miscExpenses } = req.body;
+  const sql = `INSERT INTO events (id, title, date, duration, staffName, dressCode, uniformType, arrivalTime, staffPhone, staffEmail, clientID, clientBudget, clientName, clientPhone, clientEmail, misc_expenses) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   db.run(sql, [
     id,
     title,
@@ -26,6 +27,8 @@ app.post('/api/events', (req, res) => {
     arrivalTime || '',
     staffPhone || '',
     staffEmail || '',
+    clientID || null,
+    clientBudget || 0,
     clientName || '',
     clientPhone || '',
     clientEmail || '',
@@ -254,15 +257,21 @@ app.get('/api/payroll', (req, res) => {
 // EVENTS ENDPOINTS (Updated to include assignments)
 // ==================
 
-// READ all events (with assigned staff)
+// READ all events (with assigned staff + financials)
 app.get('/api/events', (req, res) => {
-  db.all(`SELECT * FROM events ORDER BY date DESC`, [], (err, rows) => {
+  db.all(`SELECT e.*, c.name as clientName, c.phone as clientPhone, c.email as clientEmail 
+          FROM events e 
+          LEFT JOIN clients c ON e.clientID = c.id 
+          ORDER BY e.date DESC`, [], (err, rows) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
-    // For each event, fetch assignments
+    // For each event, fetch assignments and calculate financials
     const eventPromises = rows.map(row => {
       return new Promise((resolve) => {
+        const miscExpenses = row.misc_expenses ? JSON.parse(row.misc_expenses) : [];
+        const miscTotal = miscExpenses.reduce((sum, e) => sum + e.amount, 0);
+        
         const event = {
           id: row.id,
           title: row.title,
@@ -271,13 +280,15 @@ app.get('/api/events', (req, res) => {
           staffName: row.staffName,
           staffPhone: row.staffPhone,
           staffEmail: row.staffEmail,
-          clientName: row.clientName,
-          clientPhone: row.clientPhone,
-          clientEmail: row.clientEmail,
+          clientId: row.clientID,
+          clientName: row.clientName || row.clientName, // From join or legacy
+          clientPhone: row.clientPhone || row.clientPhone,
+          clientEmail: row.clientEmail || row.clientEmail,
+          clientBudget: row.clientBudget || 0,
           dressCode: row.dressCode,
           uniformType: row.uniformType,
           arrivalTime: row.arrivalTime,
-          miscExpenses: row.misc_expenses ? JSON.parse(row.misc_expenses) : [],
+          miscExpenses: miscExpenses,
           createdAt: row.created_at
         };
         
@@ -301,7 +312,16 @@ app.get('/api/events', (req, res) => {
               earnedAmount: s.earnedAmount || 0,
               dateWorked: s.date_worked || ''
             }));
+            
+            // Calculate totalEventCost = staff payroll + misc expenses
+            const staffPayrollCost = staffRows.reduce((sum, s) => sum + (s.earnedAmount || 0), 0);
+            event.totalEventCost = staffPayrollCost + miscTotal;
+            event.netProfit = (event.clientBudget || 0) - event.totalEventCost;
+          } else {
+            event.totalEventCost = miscTotal;
+            event.netProfit = (event.clientBudget || 0) - miscTotal;
           }
+          
           resolve(event);
         });
       });
@@ -315,7 +335,7 @@ app.get('/api/events', (req, res) => {
 
 // UPDATE event
 app.put('/api/events/:id', (req, res) => {
-  const { title, date, duration, staffName, dressCode, uniformType, arrivalTime, staffPhone, staffEmail, clientName, clientPhone, clientEmail, miscExpenses } = req.body;
+  const { title, date, duration, staffName, dressCode, uniformType, arrivalTime, staffPhone, staffEmail, clientID, clientBudget, clientName, clientPhone, clientEmail, miscExpenses } = req.body;
   
   // Build dynamic SQL to preserve fields not being updated
   const fields = [];
@@ -330,6 +350,8 @@ app.put('/api/events/:id', (req, res) => {
   if (arrivalTime !== undefined) { fields.push('arrivalTime = ?'); values.push(arrivalTime || ''); }
   if (staffPhone !== undefined) { fields.push('staffPhone = ?'); values.push(staffPhone || ''); }
   if (staffEmail !== undefined) { fields.push('staffEmail = ?'); values.push(staffEmail || ''); }
+  if (clientID !== undefined) { fields.push('clientID = ?'); values.push(clientID || null); }
+  if (clientBudget !== undefined) { fields.push('clientBudget = ?'); values.push(clientBudget || 0); }
   if (clientName !== undefined) { fields.push('clientName = ?'); values.push(clientName || ''); }
   if (clientPhone !== undefined) { fields.push('clientPhone = ?'); values.push(clientPhone || ''); }
   if (clientEmail !== undefined) { fields.push('clientEmail = ?'); values.push(clientEmail || ''); }
@@ -362,4 +384,71 @@ app.delete('/api/events/:id', (req, res) => {
 
 app.listen(port, () => {
   console.log(`Backend server running on http://localhost:${port}`);
+});
+
+// ==================
+// CLIENTS ENDPOINTS
+// ==================
+
+// GET all clients (with event stats)
+app.get('/api/clients', (req, res) => {
+  const sql = `
+    SELECT c.*, 
+           COUNT(DISTINCT e.id) as eventsBooked,
+           COALESCE(SUM(e.clientBudget), 0) as totalRevenue
+    FROM clients c
+    LEFT JOIN events e ON c.id = e.clientID
+    GROUP BY c.id
+    ORDER BY totalRevenue DESC
+  `;
+  db.all(sql, [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ 
+      clients: rows.map(r => ({
+        id: r.id,
+        name: r.name,
+        contactPerson: r.contactPerson,
+        email: r.email,
+        phone: r.phone,
+        eventsBooked: r.eventsBooked || 0,
+        totalRevenue: r.totalRevenue || 0
+      }))
+    });
+  });
+});
+
+// CREATE client
+app.post('/api/clients', (req, res) => {
+  const { name, contactPerson, email, phone } = req.body;
+  if (!name) return res.status(400).json({ error: 'name required' });
+  
+  const sql = `INSERT INTO clients (name, contactPerson, email, phone) VALUES (?, ?, ?, ?)`;
+  db.run(sql, [name, contactPerson || '', email || '', phone || ''], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.status(201).json({ id: this.lastID, message: 'Client created' });
+  });
+});
+
+// UPDATE client
+app.put('/api/clients/:id', (req, res) => {
+  const { name, contactPerson, email, phone } = req.body;
+  const sql = `UPDATE clients SET name = ?, contactPerson = ?, email = ?, phone = ? WHERE id = ?`;
+  db.run(sql, [name, contactPerson || '', email || '', phone || '', req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: 'Client updated', changes: this.changes });
+  });
+});
+
+// DELETE client
+app.delete('/api/clients/:id', (req, res) => {
+  // Check if client has events
+  db.get('SELECT id FROM events WHERE clientID = ?', [req.params.id], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (row) return res.status(400).json({ error: 'Cannot delete client with booked events' });
+    
+    db.run('DELETE FROM clients WHERE id = ?', [req.params.id], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ message: 'Client deleted', changes: this.changes });
+    });
+  });
 });

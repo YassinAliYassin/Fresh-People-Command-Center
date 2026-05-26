@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, User, Shirt, Clock, Trash2, Mail, MessageCircle, Users, Copy, CheckCircle, XCircle, FileText, Send, Receipt } from 'lucide-react';
+import { Calendar, User, Shirt, Clock, Trash2, Mail, MessageCircle, Users, Copy, CheckCircle, XCircle, FileText, Send, Receipt, DollarSign, FileDown } from 'lucide-react';
 import { BackendEvent, MiscExpense } from '../types';
 import MiscExpenses from './MiscExpenses';
 
@@ -376,6 +376,12 @@ Fresh People Events Team`;
             Expenses: R{totalExpenses.toFixed(2)}
           </div>
         )}
+        {event.netProfit !== undefined && (
+          <div className={`flex items-center gap-1 ${event.netProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            <DollarSign className="w-3 h-3" />
+            Profit: R{event.netProfit.toFixed(2)}
+          </div>
+        )}
       </div>
 
       {/* Contact Action Row - only show if contact info exists */}
@@ -401,6 +407,14 @@ Fresh People Events Team`;
             <Mail className="w-5 h-5" />
             <span className="hidden sm:inline">Email</span>
           </a>
+          <button
+            onClick={() => window.open(`/event-report.html?eventId=${event.id}`, '_blank')}
+            className="flex items-center gap-2 text-sm text-yellow-400 hover:text-yellow-300 transition-colors p-2 -m-2 min-h-[44px] min-w-[44px] justify-center"
+            title="Export Event Report"
+          >
+            <FileDown className="w-5 h-5" />
+            <span className="hidden sm:inline">Report</span>
+          </button>
         </div>
       )}
     </div>
