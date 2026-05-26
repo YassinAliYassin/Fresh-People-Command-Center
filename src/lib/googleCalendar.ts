@@ -79,7 +79,7 @@ export async function pushEventToGoogleCalendar(
 
   const body = {
     summary: event.title,
-    description: `Fresh People Command Center Scheduled Event\n\nClient Partner: ${clientName}\nVenue Location: ${venueName} (${venueAddress})\n\nNotes: ${event.notes || 'No manual notes specified.'}`,
+    description: `Flow Command Center Scheduled Event\\n\\nClient Partner: ${clientName}\\nVenue Location: ${venueName} (${venueAddress})\\n\\nNotes: ${event.notes || 'No manual notes specified.'}`,
     location: venueAddress || venueName,
     start: {
       dateTime: startISO,

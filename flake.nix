@@ -1,5 +1,5 @@
 {
-  description = "Fresh People Command Center Production-Ready Environment";
+  description = "Flow Command Center Production-Ready Environment";
 
   inputs = {
     nixpkgs.url = "github:Nixos/nixpkgs/nixos-unstable";
@@ -21,7 +21,7 @@
           ];
 
           shellHook = ''
-            echo "⚡ Fresh People Command Center Environment Active ⚡"
+            echo "⚡ Flow Command Center Environment Active ⚡"
             export TZ="Africa/Johannesburg"
             
             # Setup local postgres data directory if it doesn't exist

@@ -64,7 +64,7 @@ Here's your payroll summary for the period ${payroll?.cycleStart} to ${payroll?.
 Thank you for your hard work!
 
 Best regards,
-Fresh People Events Team`;
+Flow Events Team`;
 
     const url = `https://wa.me/${staff.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');

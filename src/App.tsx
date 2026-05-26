@@ -56,7 +56,7 @@ function App() {
                 element={
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-1">
-                      <EventForm onSuccess={() => setRefreshKey(k => k + 1)} />
+                      <EventForm onEventCreated={() => setRefreshKey(k => k + 1)} />
                     </div>
                     <div className="lg:col-span-2">
                       <EventList key={refreshKey} />

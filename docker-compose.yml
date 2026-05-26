@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  flow:
+    build: .
+    ports:
+      - "3001:3001"
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+    volumes:
+      - ./data:/app/data
+      - ./events.db:/app/events.db
+    restart: unless-stopped
+
+  # Optional: Add a reverse proxy like Caddy or Nginx if needed
+  # caddy:
+  #   image: caddy:2
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./Caddyfile:/etc/caddy/Caddyfile
+  #     - caddy_data:/data
+  #     - caddy_config:/config
+  #   depends_on:
+  #     - flow
+  #   restart: unless-stopped
+
+# volumes:
+#   caddy_data:
+#   caddy_config:

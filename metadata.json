@@ -1,6 +1,6 @@
 {
-  "name": "Fresh People Command Center",
-  "description": "Operational Command Center for Fresh People staffing and event architect agency, featuring high-end payroll calendar, staff allocations, and dispatch panel.",
+  "name": "Flow Command Center",
+  "description": "Operational Command Center for Flow staffing and event architect agency, featuring high-end payroll calendar, staff allocations, and dispatch panel.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
