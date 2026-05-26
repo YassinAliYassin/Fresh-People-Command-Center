@@ -91,7 +91,7 @@ app.delete('/api/staff/:id', (req, res) => {
 // GET event assignments with staff details
 app.get('/api/events/:id/assignments', (req, res) => {
   const sql = `
-    SELECT sa.id, sa.eventId, sa.staffId, 
+    SELECT sa.id, sa.eventId, sa.staffId, sa.shift_type,
            s.fullName, s.phone, s.role
     FROM staff_assignments sa
     JOIN staff s ON s.id = sa.staffId
@@ -103,12 +103,10 @@ app.get('/api/events/:id/assignments', (req, res) => {
       id: row.id,
       eventId: row.eventId,
       staffId: row.staffId,
-        staff: {
-          id: row.staffId,
-          fullName: row.fullName,
-          phone: row.phone,
-          role: row.role
-        }
+      shiftType: row.shift_type || 'Full Shift',
+      fullName: row.fullName,
+      phone: row.phone,
+      role: row.role
     }));
     res.json({ assignments });
   });
@@ -116,7 +114,7 @@ app.get('/api/events/:id/assignments', (req, res) => {
 
 // ASSIGN staff to event
 app.post('/api/events/:id/assignments', (req, res) => {
-  const { staffId } = req.body;
+  const { staffId, shiftType } = req.body;
   if (!staffId) return res.status(400).json({ error: 'staffId required' });
   
   // Check if already assigned
@@ -125,10 +123,25 @@ app.post('/api/events/:id/assignments', (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     if (row) return res.status(400).json({ error: 'Staff already assigned to this event' });
     
-    db.run('INSERT INTO staff_assignments (eventId, staffId) VALUES (?, ?)', 
-      [req.params.id, staffId], function(err) {
+    // Shift conflict check: same staff on same day in overlapping shifts
+    const checkConflict = `
+      SELECT e.date, e.title FROM events e
+      JOIN staff_assignments sa ON e.id = sa.eventId
+      WHERE sa.staffId = ? AND e.date = (SELECT date FROM events WHERE id = ?)
+      AND sa.shift_type != ? AND sa.shift_type != 'Double Shift'
+    `;
+    db.get(checkConflict, [staffId, req.params.id, shiftType || 'Full Shift'], (err, conflictRow) => {
       if (err) return res.status(500).json({ error: err.message });
-      res.status(201).json({ id: this.lastID, message: 'Staff assigned' });
+      
+      const insertSql = 'INSERT INTO staff_assignments (eventId, staffId, shift_type) VALUES (?, ?, ?)';
+      db.run(insertSql, [req.params.id, staffId, shiftType || 'Full Shift'], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        const response = { id: this.lastID, message: 'Staff assigned' };
+        if (conflictRow) {
+          response.warning = `Shift conflict: Staff already assigned to "${conflictRow.title}" on same day`;
+        }
+        res.status(201).json(response);
+      });
     });
   });
 });
@@ -172,9 +185,10 @@ app.get('/api/events', (req, res) => {
           createdAt: row.created_at
         };
         
-        // Fetch assigned staff
+        // Fetch assigned staff with shift type
         const sql = `
-          SELECT s.* FROM staff s
+          SELECT s.id, s.fullName, s.phone, s.role, sa.shift_type 
+          FROM staff s
           JOIN staff_assignments sa ON s.id = sa.staffId
           WHERE sa.eventId = ?
         `;
@@ -184,7 +198,8 @@ app.get('/api/events', (req, res) => {
               id: s.id,
               fullName: s.fullName,
               phone: s.phone,
-              role: s.role
+              role: s.role,
+              shiftType: s.shift_type || 'Full Shift'
             }));
           }
           resolve(event);

@@ -31,7 +31,9 @@ const getWhatsAppLink = () => {
     if (!phone) return '#';
     const name = primary?.fullName || event.staffName || event.clientName || 'there';
     const role = primary?.role || '';
-    const text = `Hello ${name}${role ? ` (${role})` : ''}, regarding the ${event.title} on ${formatDate(event.date)}`;
+    const shiftType = primary?.shiftType || '';
+    const shiftText = shiftType && shiftType !== 'Full Shift' ? ` (${shiftType})` : '';
+    const text = `Hello ${name}${role ? ` (${role})` : ''}${shiftText}, regarding the ${event.title} on ${formatDate(event.date)}`;
     return `https://wa.me/${phone.replace(/\\D/g, '')}?text=${encodeURIComponent(text)}`;
   };
 
@@ -92,6 +94,9 @@ const getWhatsAppLink = () => {
                 {event.assignedStaff.map(staff => (
                   <span key={staff.id} className="text-xs bg-gray-700 px-2 py-1 rounded">
                     {`${staff.fullName} - ${staff.role}`}
+                    {staff.shiftType && staff.shiftType !== 'Full Shift' && (
+                      <span className="ml-1 text-blue-400">({staff.shiftType})</span>
+                    )}
                   </span>
                 ))}
               </div>

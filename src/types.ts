@@ -57,9 +57,15 @@ export interface Staff {
   notes?: string;
   created_at?: string;
 }
+
+export interface StaffAssignment {
   id: number;
   eventId: string;
   staffId: number;
+  fullName: string;
+  phone: string;
+  role: string;
+  shiftType: 'Full Shift' | 'Shift A' | 'Shift B' | 'Double Shift';
   staff?: Staff;  // Populated when joining
 }
 
@@ -71,7 +77,7 @@ export interface BackendEvent {
   staffName?: string;  // Legacy single-assignment (for migration)
   staffPhone?: string;
   staffEmail?: string;
-  assignedStaff?: Staff[];  // New many-to-many roster
+  assignedStaff?: StaffAssignment[];  // New many-to-many roster with shift type
   clientName?: string;
   clientPhone?: string;
   clientEmail?: string;

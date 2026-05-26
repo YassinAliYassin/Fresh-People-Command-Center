@@ -5,13 +5,16 @@ import { Staff } from '../types';
 interface StaffPickerProps {
   eventId: string;
   assignedStaff: Staff[];
-  onAssign: (staffId: number) => void;
+  onAssign: (staffId: number, shiftType: string) => void;
   onUnassign: (staffId: number) => void;
 }
+
+const SHIFT_TYPES = ['Full Shift', 'Shift A', 'Shift B', 'Double Shift'];
 
 const StaffPicker: React.FC<StaffPickerProps> = ({ eventId, assignedStaff, onAssign, onUnassign }) => {
   const [allStaff, setAllStaff] = useState<Staff[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedShift, setSelectedShift] = useState<string>('Full Shift');
   const [loading, setLoading] = useState(true);
 
   // Fetch all staff
@@ -66,6 +69,20 @@ const StaffPicker: React.FC<StaffPickerProps> = ({ eventId, assignedStaff, onAss
         />
       </div>
 
+      {/* Shift Type Selector */}
+      <div className="mb-4">
+        <label className="text-sm text-gray-400 mb-1 block">Shift Type for New Assignments</label>
+        <select
+          value={selectedShift}
+          onChange={(e) => setSelectedShift(e.target.value)}
+          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+        >
+          {SHIFT_TYPES.map(type => (
+            <option key={type} value={type}>{type}</option>
+          ))}
+        </select>
+      </div>
+
       {/* Dual Column Layout */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Available Staff */}
@@ -86,9 +103,9 @@ const StaffPicker: React.FC<StaffPickerProps> = ({ eventId, assignedStaff, onAss
                     <p className="text-sm font-medium text-white truncate">{`${staff.fullName} - ${staff.role}`}</p>
                   </div>
                   <button
-                    onClick={() => onAssign(staff.id)}
+                    onClick={() => onAssign(staff.id, selectedShift)}
                     className="ml-2 p-2 text-green-400 hover:text-green-300 hover:bg-gray-600 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-                    title={`Assign ${staff.fullName}`}
+                    title={`Assign ${staff.fullName} (${selectedShift})`}
                   >
                     <UserPlus className="w-4 h-4" />
                   </button>
@@ -113,7 +130,14 @@ const StaffPicker: React.FC<StaffPickerProps> = ({ eventId, assignedStaff, onAss
                   className="flex items-center justify-between bg-blue-900/30 p-3 rounded-lg border border-blue-800"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">{`${staff.fullName} - ${staff.role}`}</p>
+                    <p className="text-sm font-medium text-white truncate">
+                      {`${staff.fullName} - ${staff.role}`}
+                      {'shiftType' in staff && (
+                        <span className="ml-2 text-xs bg-blue-800 px-2 py-0.5 rounded">
+                          {(staff as any).shiftType}
+                        </span>
+                      )}
+                    </p>
                     {staff.phone && <p className="text-xs text-gray-500">{staff.phone}</p>}
                   </div>
                   <button
