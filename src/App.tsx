@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
-import { Calendar, Users } from 'lucide-react';
+import { Calendar, Users, Building, DollarSign } from 'lucide-react';
 import EventForm from './components/EventForm';
 import EventList from './components/EventList';
 import CalendarView from './components/CalendarView';
+import ClientsView from './components/ClientsView';
+import PayrollSummary from './components/PayrollSummary';
 
 // Persistent Navigation - Fixed bottom on mobile, top on desktop
 const Navbar = () => {
@@ -24,6 +26,20 @@ const Navbar = () => {
           >
             <Calendar size={20} />
             <span className="text-xs sm:text-sm">Calendar</span>
+          </Link>
+          <Link
+            to="/clients"
+            className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+          >
+            <Building size={20} />
+            <span className="text-xs sm:text-sm">Clients</span>
+          </Link>
+          <Link
+            to="/payroll"
+            className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+          >
+            <DollarSign size={20} />
+            <span className="text-xs sm:text-sm">Payroll</span>
           </Link>
         </div>
       </div>
@@ -77,6 +93,8 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/events" element={<EventManagement />} />
           <Route path="/calendar" element={<CalendarView />} />
+          <Route path="/clients" element={<ClientsView />} />
+          <Route path="/payroll" element={<PayrollSummary />} />
           <Route path="*" element={<Navigate to="/events" replace />} />
         </Routes>
       </main>
