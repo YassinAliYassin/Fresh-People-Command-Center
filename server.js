@@ -13,8 +13,8 @@ app.use(cors());
 
 // CREATE event
 app.post('/api/events', (req, res) => {
-  const { id, title, date, duration, staffName, dressCode, uniformType, arrivalTime, staffPhone, staffEmail, clientName, clientPhone, clientEmail } = req.body;
-  const sql = `INSERT INTO events (id, title, date, duration, staffName, dressCode, uniformType, arrivalTime, staffPhone, staffEmail, clientName, clientPhone, clientEmail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  const { id, title, date, duration, staffName, dressCode, uniformType, arrivalTime, staffPhone, staffEmail, clientName, clientPhone, clientEmail, miscExpenses } = req.body;
+  const sql = `INSERT INTO events (id, title, date, duration, staffName, dressCode, uniformType, arrivalTime, staffPhone, staffEmail, clientName, clientPhone, clientEmail, misc_expenses) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   db.run(sql, [
     id,
     title,
@@ -28,7 +28,8 @@ app.post('/api/events', (req, res) => {
     staffEmail || '',
     clientName || '',
     clientPhone || '',
-    clientEmail || ''
+    clientEmail || '',
+    miscExpenses ? JSON.stringify(miscExpenses) : '[]'
   ], function(err) {
     if (err) {
       return res.status(500).json({ error: err.message });
@@ -276,6 +277,7 @@ app.get('/api/events', (req, res) => {
           dressCode: row.dressCode,
           uniformType: row.uniformType,
           arrivalTime: row.arrivalTime,
+          miscExpenses: row.misc_expenses ? JSON.parse(row.misc_expenses) : [],
           createdAt: row.created_at
         };
         
@@ -313,23 +315,34 @@ app.get('/api/events', (req, res) => {
 
 // UPDATE event
 app.put('/api/events/:id', (req, res) => {
-  const { title, date, duration, staffName, dressCode, uniformType, arrivalTime, staffPhone, staffEmail, clientName, clientPhone, clientEmail } = req.body;
-  const sql = `UPDATE events SET title = ?, date = ?, duration = ?, staffName = ?, dressCode = ?, uniformType = ?, arrivalTime = ?, staffPhone = ?, staffEmail = ?, clientName = ?, clientPhone = ?, clientEmail = ? WHERE id = ?`;
-  db.run(sql, [
-    title,
-    date,
-    duration,
-    staffName || '',
-    dressCode || '',
-    uniformType || '',
-    arrivalTime || '',
-    staffPhone || '',
-    staffEmail || '',
-    clientName || '',
-    clientPhone || '',
-    clientEmail || '',
-    req.params.id
-  ], function(err) {
+  const { title, date, duration, staffName, dressCode, uniformType, arrivalTime, staffPhone, staffEmail, clientName, clientPhone, clientEmail, miscExpenses } = req.body;
+  
+  // Build dynamic SQL to preserve fields not being updated
+  const fields = [];
+  const values = [];
+  
+  if (title !== undefined) { fields.push('title = ?'); values.push(title); }
+  if (date !== undefined) { fields.push('date = ?'); values.push(date); }
+  if (duration !== undefined) { fields.push('duration = ?'); values.push(duration); }
+  if (staffName !== undefined) { fields.push('staffName = ?'); values.push(staffName || ''); }
+  if (dressCode !== undefined) { fields.push('dressCode = ?'); values.push(dressCode || ''); }
+  if (uniformType !== undefined) { fields.push('uniformType = ?'); values.push(uniformType || ''); }
+  if (arrivalTime !== undefined) { fields.push('arrivalTime = ?'); values.push(arrivalTime || ''); }
+  if (staffPhone !== undefined) { fields.push('staffPhone = ?'); values.push(staffPhone || ''); }
+  if (staffEmail !== undefined) { fields.push('staffEmail = ?'); values.push(staffEmail || ''); }
+  if (clientName !== undefined) { fields.push('clientName = ?'); values.push(clientName || ''); }
+  if (clientPhone !== undefined) { fields.push('clientPhone = ?'); values.push(clientPhone || ''); }
+  if (clientEmail !== undefined) { fields.push('clientEmail = ?'); values.push(clientEmail || ''); }
+  if (miscExpenses !== undefined) { fields.push('misc_expenses = ?'); values.push(JSON.stringify(miscExpenses)); }
+  
+  if (fields.length === 0) {
+    return res.status(400).json({ error: 'No fields to update' });
+  }
+  
+  values.push(req.params.id);
+  const sql = `UPDATE events SET ${fields.join(', ')} WHERE id = ?`;
+  
+  db.run(sql, values, function(err) {
     if (err) {
       return res.status(500).json({ error: err.message });
     }

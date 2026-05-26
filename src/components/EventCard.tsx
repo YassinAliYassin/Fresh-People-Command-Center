@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Calendar, User, Shirt, Clock, Trash2, Mail, MessageCircle, Users, Copy, CheckCircle, XCircle, FileText, Send } from 'lucide-react';
-import { BackendEvent } from '../types';
+import { Calendar, User, Shirt, Clock, Trash2, Mail, MessageCircle, Users, Copy, CheckCircle, XCircle, FileText, Send, Receipt } from 'lucide-react';
+import { BackendEvent, MiscExpense } from '../types';
+import MiscExpenses from './MiscExpenses';
 
 interface EventCardProps {
   event: BackendEvent;
@@ -194,6 +195,32 @@ Fresh People Events Team`;
     }
   };
 
+  // Update misc expenses
+  const updateExpenses = async (expenses: MiscExpense[]) => {
+    try {
+      const response = await fetch(`http://${window.location.hostname}:3001/api/events/${event.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...event,
+          miscExpenses: expenses
+        })
+      });
+      
+      if (response.ok) {
+        alert('Expenses updated!');
+        window.location.reload();
+      } else {
+        alert('Failed to update expenses');
+      }
+    } catch (err) {
+      console.error('Error updating expenses:', err);
+      alert('Error updating expenses');
+    }
+  };
+
+  const totalExpenses = event.miscExpenses?.reduce((sum, e) => sum + e.amount, 0) || 0;
+
   return (
     <div className="bg-gray-800 p-5 rounded-lg border border-gray-700 hover:border-blue-500 transition-colors">
       <div className="flex justify-between items-start mb-2">
@@ -321,6 +348,15 @@ Fresh People Events Team`;
           </div>
         )}
         
+        {/* Miscellaneous Expenses */}
+        <div className="mt-2">
+          <MiscExpenses 
+            eventId={event.id} 
+            expenses={event.miscExpenses || []} 
+            onUpdate={updateExpenses} 
+          />
+        </div>
+        
         <div className="flex items-center gap-1">
           <Shirt className="w-3 h-3" />
           {event.dressCode}
@@ -334,6 +370,12 @@ Fresh People Events Team`;
           <Clock className="w-3 h-3" />
           {event.duration}hr (Arrive: {formatTime(event.arrivalTime)})
         </div>
+        {totalExpenses > 0 && (
+          <div className="flex items-center gap-1 text-yellow-400">
+            <Receipt className="w-3 h-3" />
+            Expenses: R{totalExpenses.toFixed(2)}
+          </div>
+        )}
       </div>
 
       {/* Contact Action Row - only show if contact info exists */}

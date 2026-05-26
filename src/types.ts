@@ -73,6 +73,14 @@ export interface StaffAssignment {
   staff?: Staff;
 }
 
+export interface MiscExpense {
+  id: string;
+  category: 'Transport' | 'Food' | 'Equipment' | 'Materials' | 'Other';
+  description: string;
+  amount: number;
+  date: string; // YYYY-MM-DD
+}
+
 export interface BackendEvent {
   id: string;
   title: string;
@@ -88,5 +96,6 @@ export interface BackendEvent {
   dressCode: string;
   uniformType?: string;
   arrivalTime: string;
+  miscExpenses?: MiscExpense[];  // Miscellaneous expenses for tax reporting
   createdAt?: string;
 }
