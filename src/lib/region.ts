@@ -1,0 +1,1 @@
+export const SOUTH_AFRICAN_PROVINCES = [{ code: 'ZA-GP', name: 'Gauteng' }, { code: 'ZA-WC', name: 'Western Cape' }, { code: 'ZA-KZN', name: 'KwaZulu-Natal' }, { code: 'ZA', name: 'National Fallback' }];

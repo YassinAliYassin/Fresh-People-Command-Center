@@ -12,10 +12,49 @@ app.use(express.json());
 app.use(cors());
 app.use(express.static('public')); // Serve static files
 
+// Region pricing multiplier calculator (South African Provinces)
+const getMultiplier = (region, pricingTier, availabilityStatus) => {
+  let multiplier = 1.0;
+  
+  // South African Province ISO codes
+  const regionMultipliers = {
+    'ZA-GP': 1.2,    // Gauteng
+    'ZA-WC': 1.1,    // Western Cape
+    'ZA-KZN': 1.05,  // KwaZulu-Natal
+    'ZA': 1.0        // Default fallback
+};
+  
+  // Pricing tier multipliers
+  const tierMultipliers = {
+    'Standard': 1.0,
+    'Premium': 1.3,
+    'VIP': 1.6,
+    'Corporate': 1.5
+  };
+  
+  // Availability status multipliers (peak times)
+  const availabilityMultipliers = {
+    'Available': 1.0,
+    'Peak': 1.25,
+    'High Demand': 1.4,
+    'Limited': 1.15
+  };
+  
+  multiplier *= regionMultipliers[region] || regionMultipliers['ZA'];
+  multiplier *= tierMultipliers[pricingTier] || 1.0;
+  multiplier *= availabilityMultipliers[availabilityStatus] || 1.0;
+  
+  return multiplier.toFixed(2);
+};
+
 // CREATE event
 app.post('/api/events', (req, res) => {
-  const { id, title, date, duration, staffName, dressCode, uniformType, arrivalTime, staffPhone, staffEmail, clientID, clientBudget, clientName, clientPhone, clientEmail, miscExpenses } = req.body;
-  const sql = `INSERT INTO events (id, title, date, duration, staffName, dressCode, uniformType, arrivalTime, staffPhone, staffEmail, clientID, clientBudget, clientName, clientPhone, clientEmail, misc_expenses) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  const { id, title, date, duration, staffName, dressCode, uniformType, arrivalTime, staffPhone, staffEmail, clientID, clientBudget, clientName, clientPhone, clientEmail, miscExpenses, region, pricing_tier, availability_status, base_price } = req.body;
+  
+  // Calculate multiplier
+  const multiplier = getMultiplier(region || 'ZA-GP', pricing_tier || 'Standard', availability_status || 'Available');
+  
+  const sql = `INSERT INTO events (id, title, date, duration, staffName, dressCode, uniformType, arrivalTime, staffPhone, staffEmail, clientID, clientBudget, clientName, clientPhone, clientEmail, misc_expenses, region, pricing_tier, availability_status, base_price, multiplier) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   db.run(sql, [
     id,
     title,
@@ -32,7 +71,12 @@ app.post('/api/events', (req, res) => {
     clientName || '',
     clientPhone || '',
     clientEmail || '',
-    miscExpenses ? JSON.stringify(miscExpenses) : '[]'
+    miscExpenses ? JSON.stringify(miscExpenses) : '[]',
+    region || 'ZA-GP',
+    pricing_tier || 'Standard',
+    availability_status || 'Available',
+    base_price || 0,
+    multiplier
   ], function(err) {
     if (err) {
       return res.status(500).json({ error: err.message });

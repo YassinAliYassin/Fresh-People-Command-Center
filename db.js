@@ -25,6 +25,11 @@ const db = new sqlite3.Database(dbPath, (err) => {
       dressCode TEXT DEFAULT 'All Black',
       uniformType TEXT DEFAULT 'Formal All Black',
       arrivalTime TEXT,
+      region TEXT DEFAULT 'ZA-GP',
+      pricing_tier TEXT DEFAULT 'Standard',
+      availability_status TEXT DEFAULT 'Available',
+      base_price REAL DEFAULT 0,
+      multiplier REAL DEFAULT 1.0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`, (err) => {
       if (err) {
