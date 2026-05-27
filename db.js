@@ -5,7 +5,7 @@ import { dirname, resolve } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const dbPath = resolve(__dirname, 'events.db');
+const dbPath = resolve(__dirname, process.env.DB_PATH || 'events.db');
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Error opening database', err);
