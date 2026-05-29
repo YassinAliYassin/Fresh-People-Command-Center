@@ -3,6 +3,10 @@
     {
       "path": "/api/sync-icloud?secret=$SYNC_SECRET",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/daily-report?secret=$CRON_SECRET",
+      "schedule": "0 7 * * *"
     }
   ],
   "rewrites": [
