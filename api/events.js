@@ -34,6 +34,13 @@ export default async function handler(req, res) {
   }
   
   if (req.method === 'POST') {
+    // Admin auth check for write operations
+    const authHeader = req.headers.authorization;
+    const adminSecret = process.env.ADMIN_SECRET;
+    if (!adminSecret || authHeader !== `Bearer ${adminSecret}`) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     const { id, title, date, duration, staff_assigned, dressCode, arrivalTime } = req.body;
     await pool.query(
       'INSERT INTO events (id, title, date, duration, staff_assigned, dressCode, arrivalTime) VALUES ($1, $2, $3, $4, $5, $6, $7)',

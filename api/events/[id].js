@@ -8,6 +8,15 @@ const pool = new Pool({
 export default async function handler(req, res) {
   const { id } = req.query;
   
+  // Admin auth check for write operations
+  if (req.method === 'PATCH' || req.method === 'DELETE') {
+    const authHeader = req.headers.authorization;
+    const adminSecret = process.env.ADMIN_SECRET;
+    if (!adminSecret || authHeader !== `Bearer ${adminSecret}`) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+  }
+
   if (req.method === 'PATCH') {
     const { title, date, duration, staff_assigned, dressCode, arrivalTime } = req.body;
     await pool.query(
