@@ -24,7 +24,7 @@ const EventList: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
   const deleteEvent = async (id: string) => {
     if (!confirm('Delete this event?')) return;
     try {
-      await fetch(`http://localhost:3001/api/events/${id}`, { method: 'DELETE' });
+      await fetch(`/api/events/${id}`, { method: 'DELETE' });
       fetchEvents();
     } catch (err: any) {
       alert(err.message);
