@@ -5,19 +5,36 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
   changelog:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install auto-changelog
+        run: npm install -g auto-changelog
 
       - name: Generate Changelog
-        run: auto-changelog --output CHANGELOG.md
+        run: auto-changelog --output CHANGELOG.md --template keepachangelog
 
       - name: Commit & Push Changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "docs: update CHANGELOG"
           file_pattern: CHANGELOG.md
+          branch: main
+          commit_user_name: "github-actions[bot]"
+          commit_user_email: "github-actions[bot]@users.noreply.github.com"
+          commit_author: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
