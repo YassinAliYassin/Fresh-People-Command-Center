@@ -33,22 +33,15 @@ export default async function handler(req, res) {
     const events = parseCalendarEvents(icsText);
     console.log(`[Sync] Parsed ${events.length} events`);
 
-    // Upsert each event
+    // Upsert each event (ON CONFLICT handles insert vs update)
     for (const event of events) {
       try {
-        const existing = await checkIfExists(event.uid);
         const result = await upsertEvent(event);
-        
-        if (existing) {
-          stats.updated++;
-        } else {
-          stats.imported++;
-        }
-        
+        stats.imported++;
         stats.events.push({
           uid: event.uid,
           title: event.title,
-          status: existing ? 'updated' : 'imported'
+          status: 'success'
         });
       } catch (error) {
         console.error(`[Sync] Failed to upsert ${event.uid}:`, error.message);
@@ -72,17 +65,4 @@ export default async function handler(req, res) {
       stats
     });
   }
-}
-
-// Helper to check if event exists
-async function checkIfExists(uid) {
-  const { Pool } = require('pg');
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
-  });
-  
-  const result = await pool.query('SELECT uid FROM calendar_events WHERE uid = $1', [uid]);
-  pool.end();
-  return result.rows.length > 0;
 }
