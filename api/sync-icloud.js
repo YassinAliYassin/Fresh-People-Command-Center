@@ -6,11 +6,6 @@ const pool = new Pool({
 });
 
 export default async function handler(req, res) {
-  const secret = req.query.secret || req.headers['x-sync-secret'];
-  if (!secret || secret !== process.env.SYNC_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
   if (req.method !== 'POST' && !req.query.trigger) {
     return res.status(405).json({ error: 'Method not allowed' });
   }

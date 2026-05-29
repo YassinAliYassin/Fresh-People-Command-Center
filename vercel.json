@@ -1,11 +1,11 @@
 {
   "crons": [
     {
-      "path": "/api/sync-icloud?secret=$SYNC_SECRET",
+      "path": "/api/sync-icloud",
       "schedule": "0 0 * * *"
     },
     {
-      "path": "/api/daily-report?secret=$CRON_SECRET",
+      "path": "/api/daily-report",
       "schedule": "0 7 * * *"
     }
   ],
