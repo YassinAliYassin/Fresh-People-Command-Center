@@ -20,3 +20,4 @@ rename-*.js
 
 # Temp scripts
 create-*.js
+.vercel
