@@ -27,6 +27,13 @@ export default async function handler(req, res) {
   }
   
   if (req.method === 'POST') {
+    // Admin auth check for write operations
+    const authHeader = req.headers.authorization;
+    const adminSecret = process.env.ADMIN_SECRET;
+    if (!adminSecret || authHeader !== `Bearer ${adminSecret}`) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     const { name, phone, role } = req.body;
     const { rows } = await pool.query(
       'INSERT INTO staff (name, phone, role) VALUES ($1, $2, $3) RETURNING *',

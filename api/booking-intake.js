@@ -2,6 +2,13 @@ import { createBooking } from '../lib/db-phase2.js';
 
 // Simple NLP pattern matching for WhatsApp booking messages
 export default async function handler(req, res) {
+  // Admin auth check for write operations
+  const authHeader = req.headers.authorization;
+  const adminSecret = process.env.ADMIN_SECRET;
+  if (!adminSecret || authHeader !== `Bearer ${adminSecret}`) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

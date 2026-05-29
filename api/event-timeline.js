@@ -6,6 +6,15 @@ const pool = new Pool({
 });
 
 export default async function handler(req, res) {
+  // Admin auth check for write operations (POST)
+  if (req.method === 'POST') {
+    const authHeader = req.headers.authorization;
+    const adminSecret = process.env.ADMIN_SECRET;
+    if (!adminSecret || authHeader !== `Bearer ${adminSecret}`) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+  }
+
   if (req.method === 'GET') {
     return getTimeline(req, res);
   } else if (req.method === 'POST') {
