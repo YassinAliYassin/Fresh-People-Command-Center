@@ -1,6 +1,14 @@
 {
+  "crons": [
+    {
+      "path": "/api/sync-icloud?secret=$SYNC_SECRET",
+      "schedule": "*/15 * * * *"
+    }
+  ],
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/(.*)", "destination": "/" }
+    {
+      "source": "/(.*)",
+      "destination": "/$1"
+    }
   ]
 }
