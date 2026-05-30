@@ -41,13 +41,12 @@ const StaffView = () => {
     setSuccessMsg('');
 
     try {
-      const url = editingId ? `/api/staff/${editingId}` : '/api/staff';
-      const method = editingId ? 'PUT' : 'POST';
+      const method = editingId ? 'PATCH' : 'POST';
       
-      const res = await fetch(url, {
+      const res = await fetch('/api/staff', {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(editingId ? { ...formData, id: editingId } : formData)
       });
 
       if (!res.ok) throw new Error('Failed to save staff');
@@ -79,7 +78,11 @@ const StaffView = () => {
     if (!confirm('Delete this staff member?')) return;
     
     try {
-      const res = await fetch(`/api/staff/${id}`, { method: 'DELETE' });
+      const res = await fetch('/api/staff', { 
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
       if (!res.ok) throw new Error('Failed to delete staff');
       fetchStaff();
     } catch (err: any) {
