@@ -5,7 +5,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Init table
+// Init tables
 async function initDB() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS events (
@@ -16,17 +16,66 @@ async function initDB() {
       staff_assigned TEXT,
       dressCode TEXT,
       arrivalTime TEXT,
+      clientName TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
+  
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS staff (
+      id SERIAL PRIMARY KEY,
+      fullName TEXT NOT NULL,
+      phone TEXT DEFAULT '',
+      role TEXT DEFAULT '',
+      rate REAL DEFAULT 0,
+      notes TEXT DEFAULT ''
+    )
+  `);
+}
+
+// Send WhatsApp message
+async function sendWhatsAppMessage(phone, message) {
+  const token = process.env.WHATSAPP_ACCESS_TOKEN;
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  
+  if (!token || !phoneId) {
+    console.log('[WhatsApp] Missing credentials, skipping');
+    return false;
+  }
+  
+  try {
+    const response = await fetch(`https://graph.facebook.com/v22.0/${phoneId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: phone,
+        type: 'text',
+        text: { body: message }
+      })
+    });
+    
+    const result = await response.json();
+    if (result.error) {
+      console.error('[WhatsApp] Error:', result.error);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('[WhatsApp] Send failed:', e.message);
+    return false;
+  }
 }
 
 export default async function handler(req, res) {
   await initDB();
   
-  const { id } = req.query; // id from /api/events/[id] or undefined for /api/events
+  const { id } = req.query;
   
-  // Single event operations (events/[id])
+  // Single event operations
   if (id) {
     if (req.method === 'GET') {
       const { rows } = await pool.query('SELECT * FROM events WHERE id = $1', [id]);
@@ -39,7 +88,6 @@ export default async function handler(req, res) {
     }
     
     if (req.method === 'PATCH' || req.method === 'DELETE') {
-      // Admin auth check for write operations
       const authHeader = req.headers.authorization;
       const adminSecret = process.env.ADMIN_SECRET;
       if (!adminSecret || authHeader !== `Bearer ${adminSecret}`) {
@@ -64,7 +112,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
   
-  // Collection operations (events/)
+  // Collection operations
   if (req.method === 'GET') {
     const { rows } = await pool.query('SELECT * FROM events ORDER BY date ASC');
     const events = rows.map(row => ({
@@ -75,19 +123,41 @@ export default async function handler(req, res) {
   }
   
   if (req.method === 'POST') {
-    // Admin auth check for write operations
     const authHeader = req.headers.authorization;
     const adminSecret = process.env.ADMIN_SECRET;
     if (!adminSecret || authHeader !== `Bearer ${adminSecret}`) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     
-    const { id, title, date, duration, staff_assigned, dressCode, arrivalTime } = req.body;
+    const { id, title, date, duration, staff_assigned, dressCode, arrivalTime, clientName, sendWhatsApp } = req.body;
+    
     await pool.query(
-      'INSERT INTO events (id, title, date, duration, staff_assigned, dressCode, arrivalTime) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-      [id, title, date, duration, JSON.stringify(staff_assigned), dressCode, arrivalTime]
+      'INSERT INTO events (id, title, date, duration, staff_assigned, dressCode, arrivalTime, clientName) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+      [id, title, date, duration, JSON.stringify(staff_assigned), dressCode, arrivalTime, clientName]
     );
-    return res.json({ id, message: 'Event created successfully' });
+    
+    // Send WhatsApp notifications if requested
+    let whatsappResults = [];
+    if (sendWhatsApp && staff_assigned && staff_assigned.length > 0) {
+      const eventDate = new Date(date);
+      const whatsappMessage = `📅 NEW BOOKING ASSIGNED\n\nEvent: ${title}\nDate: ${eventDate.toLocaleDateString()}\nTime: ${eventDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}\nDuration: ${duration || 4}hrs\nArrival: ${arrivalTime || '1hr before'}\nDress: ${dressCode || 'Formal All Black'}\nClient: ${clientName || 'TBD'}\n\nPlease confirm availability. Thank you!`;
+      
+      for (const staffName of staff_assigned) {
+        // Fetch staff phone from DB
+        const staffResult = await pool.query('SELECT phone FROM staff WHERE fullName = $1', [staffName]);
+        if (staffResult.rows.length > 0 && staffResult.rows[0].phone) {
+          const phone = staffResult.rows[0].phone;
+          const success = await sendWhatsAppMessage(phone, whatsappMessage);
+          whatsappResults.push({ staff: staffName, phone, sent: success });
+        }
+      }
+    }
+    
+    return res.json({ 
+      id, 
+      message: 'Event created successfully',
+      whatsapp: whatsappResults.length > 0 ? whatsappResults : undefined
+    });
   }
   
   res.status(405).json({ error: 'Method not allowed' });

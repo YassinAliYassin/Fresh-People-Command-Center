@@ -45,6 +45,9 @@ const calendarStyles = `
     border-radius: 4px;
     padding: 2px 6px;
   }
+  .rbc-event.icloud {
+    background: #7c3aed;
+  }
   .rbc-show-more {
     color: #60a5fa;
     background: transparent;
@@ -85,36 +88,34 @@ const CalendarView = () => {
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        // Fetch local events
-        const localRes = await fetch('/api/events');
-        const localData = await localRes.json();
+        // Fetch from unified calendar endpoint (includes iCloud)
+        const calRes = await fetch('/api/calendar?format=json');
+        const calData = await calRes.json();
         
-        // Fetch iCloud calendar events
-        const icloudRes = await fetch('/api/calendar');
-        const icloudData = await icloudRes.json();
-        
-        const localEvents = localData.events.map((event) => {
-          const start = new Date(event.date);
-          const end = new Date(start.getTime() + event.duration * 60 * 60 * 1000);
+        const localEvents = (calData.local || []).map((event) => {
+          const start = new Date(event.start);
+          const end = new Date(event.end || start.getTime() + (event.duration || 4) * 60 * 60 * 1000);
           const staffList = Array.isArray(event.staff_assigned) 
             ? event.staff_assigned.join(', ') 
-            : event.staff_assigned || 'Unassigned';
+            : (event.staff_assigned || 'Unassigned');
           return {
             title: `${event.title} • ${staffList}`,
             start,
             end,
             resource: { ...event, source: 'local' },
+            className: ''
           };
         });
         
-        const icloudEvents = icloudData.events.map((event) => {
+        const icloudEvents = (calData.icloud || []).map((event) => {
           const start = new Date(event.start);
-          const end = event.end ? new Date(event.end) : new Date(start.getTime() + 4 * 60 * 60 * 1000);
+          const end = new Date(event.end || start.getTime() + 4 * 60 * 60 * 1000);
           return {
             title: `☁️ ${event.title}`,
             start,
             end,
             resource: { ...event, source: 'icloud' },
+            className: 'icloud'
           };
         });
         
@@ -135,7 +136,7 @@ const CalendarView = () => {
       <style>{calendarStyles}</style>
       <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
         <span className="text-blue-400">📅</span>
-        Event Calendar
+        Event Calendar (iCloud + Local)
       </h2>
       <div className="h-[60vh] sm:h-[70vh]">
         <Calendar
@@ -144,6 +145,9 @@ const CalendarView = () => {
           startAccessor="start"
           endAccessor="end"
           style={{ height: '100%' }}
+          eventPropGetter={(event) => ({
+            className: event.resource?.source === 'icloud' ? 'icloud' : ''
+          })}
         />
       </div>
     </div>

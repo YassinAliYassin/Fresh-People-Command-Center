@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CalendarPlus, User, Clock, Shirt, CheckCircle } from 'lucide-react';
+import { CalendarPlus, User, Clock, Shirt, CheckCircle, MessageSquare } from 'lucide-react';
 import { BackendEvent } from '../types';
 
 const generateEventId = (): string => {
@@ -14,13 +14,16 @@ const EventForm: React.FC<{ onEventCreated?: () => void }> = ({ onEventCreated }
     id: generateEventId(),
     duration: 4,
     dressCode: 'All Black',
-    arrivalTime: ''
+    arrivalTime: '',
+    clientName: ''
   });
-  const [staffList, setStaffList] = useState<Array<{ id: number; fullName: string }>>([]);
+  const [staffList, setStaffList] = useState<Array<{ id: number; fullName: string; phone: string }>>([]);
   const [staffAssigned, setStaffAssigned] = useState<number[]>([]);
+  const [sendWhatsApp, setSendWhatsApp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [whatsappResults, setWhatsappResults] = useState<Array<{ staff: string; sent: boolean }>>([]);
 
   // Fetch staff from API
   useEffect(() => {
@@ -52,6 +55,7 @@ const EventForm: React.FC<{ onEventCreated?: () => void }> = ({ onEventCreated }
     e.preventDefault();
     setLoading(true);
     setError('');
+    setWhatsappResults([]);
 
     try {
       const res = await fetch('/api/events', {
@@ -61,14 +65,26 @@ const EventForm: React.FC<{ onEventCreated?: () => void }> = ({ onEventCreated }
           ...event, 
           staff_assigned: staffAssigned.map(id => 
             staffList.find(s => s.id === id)?.fullName || ''
-          ).filter(Boolean)
+          ).filter(Boolean),
+          sendWhatsApp: sendWhatsApp
         })
       });
-      if (!res.ok) throw new Error('Failed to create event');
-      setSuccessMsg('Event created successfully!');
-      setEvent({ id: generateEventId(), duration: 4, dressCode: 'All Black', arrivalTime: '' });
+      
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error || 'Failed to create event');
+      
+      let msg = 'Event created successfully!';
+      if (data.whatsapp && data.whatsapp.length > 0) {
+        setWhatsappResults(data.whatsapp);
+        const sent = data.whatsapp.filter((r: any) => r.sent).length;
+        msg += ` WhatsApp sent to ${sent}/${data.whatsapp.length} staff.`;
+      }
+      
+      setSuccessMsg(msg);
+      setEvent({ id: generateEventId(), duration: 4, dressCode: 'All Black', arrivalTime: '', clientName: '' });
       setStaffAssigned([]);
-      setTimeout(() => setSuccessMsg(''), 3000);
+      setTimeout(() => setSuccessMsg(''), 5000);
       if (onEventCreated) onEventCreated();
     } catch (err: any) {
       setError(err.message);
@@ -85,9 +101,20 @@ const EventForm: React.FC<{ onEventCreated?: () => void }> = ({ onEventCreated }
       </h2>
 
       {successMsg && (
-        <div className="mb-4 p-3 bg-green-900/50 border border-green-700 rounded-lg flex items-center gap-2 text-green-300">
-          <CheckCircle size={18} />
-          {successMsg}
+        <div className="mb-4 p-3 bg-green-900/50 border border-green-700 rounded-lg flex items-start gap-2 text-green-300">
+          <CheckCircle size={18} className="mt-0.5" />
+          <div>
+            <p>{successMsg}</p>
+            {whatsappResults.length > 0 && (
+              <div className="mt-2 text-sm">
+                {whatsappResults.map((r, i) => (
+                  <div key={i} className={r.sent ? 'text-green-400' : 'text-red-400'}>
+                    {r.sent ? '✓' : '✗'} {r.staff} {r.phone || ''}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -116,6 +143,17 @@ const EventForm: React.FC<{ onEventCreated?: () => void }> = ({ onEventCreated }
             value={event.title || ''}
             onChange={e => handleChange('title', e.target.value)}
             required
+            className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-400 mb-1">Client Name</label>
+          <input
+            type="text"
+            placeholder="e.g. ABC Corporation"
+            value={event.clientName || ''}
+            onChange={e => handleChange('clientName', e.target.value)}
             className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -191,12 +229,24 @@ const EventForm: React.FC<{ onEventCreated?: () => void }> = ({ onEventCreated }
           />
         </div>
 
+        <label className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg border border-slate-700 cursor-pointer hover:bg-slate-800 transition-colors">
+          <input
+            type="checkbox"
+            checked={sendWhatsApp}
+            onChange={(e) => setSendWhatsApp(e.target.checked)}
+            className="rounded border-slate-600 text-green-600 focus:ring-green-500 bg-slate-800 w-5 h-5"
+          />
+          <MessageSquare size={20} className="text-green-400" />
+          <span className="text-gray-200">Send booking details via WhatsApp to assigned staff</span>
+        </label>
+
         <button
           type="submit"
           disabled={loading}
-          className="w-full min-h-[48px] bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
+          className="w-full min-h-[48px] bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
         >
-          {loading ? 'Creating...' : 'Create Event'}
+          <CalendarPlus size={20} />
+          {loading ? 'Creating...' : 'Create Event & Notify Staff'}
         </button>
       </form>
     </div>
