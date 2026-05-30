@@ -12,6 +12,11 @@ app.use(express.json());
 app.use(cors());
 app.use(express.static('public')); // Serve static files
 
+// Health check endpoint for deployment readiness
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'healthy' });
+});
+
 // Region pricing multiplier calculator (South African Provinces)
 const getMultiplier = (region, pricingTier, availabilityStatus) => {
   let multiplier = 1.0;
