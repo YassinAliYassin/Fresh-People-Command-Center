@@ -21,7 +21,7 @@ export default async function handler(req, res) {
 
     // Fetch Google Calendar events
     try {
-      const googleApiUrl = `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/api/calendar/google/test`;
+      const googleApiUrl = `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/api/calendar/google`;
       const googleResponse = await fetch(googleApiUrl, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
@@ -46,7 +46,7 @@ export default async function handler(req, res) {
 
     // Fetch Apple Calendar events (via Nylas)
     try {
-      const appleApiUrl = `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/api/calendar/apple/nylas`;
+      const appleApiUrl = `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/api/calendar/apple`;
       const appleResponse = await fetch(appleApiUrl, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
