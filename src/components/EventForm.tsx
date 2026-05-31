@@ -47,9 +47,17 @@ const EventForm: React.FC<{ onEventCreated?: () => void }> = ({ onEventCreated }
     setError('');
     setWhatsappResults([]);
     
-    // FIX: Always read date from ref (works for both manual input and programmatic changes)
+    // DEBUG: Log everything
     const dateValue = event.date || dateRef.current?.value || '';
-    console.log('EventForm: Submitting with dateValue:', dateValue, 'event.date:', event.date);
+    const payload = { 
+      ...event,
+      date: dateValue,
+      staff_assigned: staffAssigned.map(id => 
+        staffList.find(s => s.id === id)?.name || ''
+      ).filter(Boolean),
+      sendWhatsApp: sendWhatsApp
+    };
+    console.log('EventForm: Submitting...', { dateValue, event, staffAssigned, payload });
     
     if (!dateValue) {
       setError('Please select event date & time');
@@ -58,20 +66,16 @@ const EventForm: React.FC<{ onEventCreated?: () => void }> = ({ onEventCreated }
     }
     
     try {
+      console.log('EventForm: Sending fetch to /api/events with payload:', payload);
       const res = await fetch('/api/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          ...event,
-          date: dateValue,
-          staff_assigned: staffAssigned.map(id => 
-            staffList.find(s => s.id === id)?.name || ''
-          ).filter(Boolean),
-          sendWhatsApp: sendWhatsApp
-        })
+        body: JSON.stringify(payload)
       });
       
+      console.log('EventForm: Fetch response status:', res.status);
       const data = await res.json();
+      console.log('EventForm: Fetch response data:', data);
       
       if (!res.ok) throw new Error(data.error || 'Failed to create event');
       
