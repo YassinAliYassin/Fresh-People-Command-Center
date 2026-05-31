@@ -28,7 +28,7 @@ export default async function handler(req, res) {
 
     // Fetch calendars from Nylas
     const calendarsResponse = await fetch(
-      `https://api.nylas.com/v3/grants/${nylasGrantId}/calendars`,
+      `https://api.us.nylas.com/v3/grants/${nylasGrantId}/calendars`,
       {
         method: 'GET',
         headers: {
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
     for (const calendar of calendars) {
       try {
         const eventsResponse = await fetch(
-          `https://api.nylas.com/v3/grants/${nylasGrantId}/events?calendar_id=${calendar.id}&start_time=${startTime}&end_time=${endTime}&limit=100`,
+          `https://api.us.nylas.com/v3/grants/${nylasGrantId}/events?calendar_id=${calendar.id}&start_time=${startTime}&end_time=${endTime}&limit=100`,
           {
             method: 'GET',
             headers: {
