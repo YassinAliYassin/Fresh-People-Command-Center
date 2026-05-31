@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Users, UserCog, Combine, Clock, MessageSquare, MapPin, User, FileText } from 'lucide-react';
 import UnifiedCalendarView from './Calendar/UnifiedView';
 
+// Import full Apple Calendar events (1457 events from iCloud feed)
+import appleCalendarEvents from '../data/apple-calendar-events.json';
+
 // Types
 interface Client {
   id: string;
@@ -135,100 +138,7 @@ const Dashboard: React.FC = () => {
   const [simNewTimeStart, setSimNewTimeStart] = useState('12:00');
   const [simNewTimeEnd, setSimNewTimeEnd] = useState('14:00');
   const [simNewNotes, setSimNewNotes] = useState('');
-  const [appleEvents, setAppleEvents] = useState<Event[]>(() => {
-    const raw = localStorage.getItem('fp_apple_events');
-    if (raw && raw.includes('RMA Khw breakfast')) return JSON.parse(raw);
-    
-    // Seed real primary-world iCloud / Apple Calendar events
-    const seed: Event[] = [
-      {
-        id: 'apple-live-1',
-        title: 'iCloud: RMA Khw breakfast',
-        clientId: 'client-rma',
-        venueId: 'venue-rma',
-        date: '2026-05-25',
-        startTime: '08:00',
-        endTime: '15:00',
-        staffIds: [],
-        notes: 'Synchronized from Apple Calendar feed at location: RMA.',
-        status: 'Confirmed'
-      },
-      {
-        id: 'apple-live-2',
-        title: 'iCloud: Motseng breakfast and lunch',
-        clientId: 'client-motseng',
-        venueId: 'venue-motseng',
-        date: '2026-05-25',
-        startTime: '08:00',
-        endTime: '14:30',
-        staffIds: [],
-        notes: 'Synchronized from Apple Calendar feed at location: Motseng.',
-        status: 'Confirmed'
-      },
-      {
-        id: 'apple-live-3',
-        title: 'iCloud: RMA Dolly/Mali',
-        clientId: 'client-rma',
-        venueId: 'venue-rma',
-        date: '2026-05-26',
-        startTime: '08:00',
-        endTime: '15:00',
-        staffIds: [],
-        notes: 'Synchronized from Apple Calendar feed at location: RMA.',
-        status: 'Confirmed'
-      },
-      {
-        id: 'apple-live-4',
-        title: 'iCloud: ETV',
-        clientId: 'client-etv',
-        venueId: 'venue-etv',
-        date: '2026-05-28',
-        startTime: '08:00',
-        endTime: '09:00',
-        staffIds: [],
-        notes: 'Synchronized from Apple Calendar feed.',
-        status: 'Confirmed'
-      },
-      {
-        id: 'apple-live-5',
-        title: 'iCloud: Sanofi ICDT & World Asthma Day',
-        clientId: 'client-sanofi',
-        venueId: 'venue-sanofi',
-        date: '2026-05-28',
-        startTime: '10:00',
-        endTime: '15:00',
-        staffIds: [],
-        notes: 'Synchronized from Apple Calendar feed at location: Sanofi.',
-        status: 'Confirmed'
-      },
-      {
-        id: 'apple-live-6',
-        title: 'iCloud: MAST Fre Minds eve',
-        clientId: 'client-mast',
-        venueId: 'venue-tbc',
-        date: '2026-05-29',
-        startTime: '08:00',
-        endTime: '16:00',
-        staffIds: [],
-        notes: 'Synchronized from Apple Calendar feed at location: TBC.',
-        status: 'Confirmed'
-      },
-      {
-        id: 'apple-live-7',
-        title: 'iCloud: ETV',
-        clientId: 'client-etv',
-        venueId: 'venue-etv',
-        date: '2026-05-29',
-        startTime: '08:00',
-        endTime: '09:00',
-        staffIds: [],
-        notes: 'Synchronized from Apple Calendar feed.',
-        status: 'Confirmed'
-      }
-    ];
-    localStorage.setItem('fp_apple_events', JSON.stringify(seed));
-    return seed;
-  });
+  const [appleEvents, setAppleEvents] = useState<Event[]>(appleCalendarEvents as Event[]);
 
   // Calendar view toggle
   const [showCalendar, setShowCalendar] = useState(false);
