@@ -13,17 +13,23 @@ export default async function handler(req, res) {
       idleTimeoutMillis: 100
     });
     
-    // Create table if not exists (original schema)
+    // Create table if not exists and add missing columns
     try {
       await pool.query(`
         CREATE TABLE IF NOT EXISTS staff (
           id SERIAL PRIMARY KEY,
           name TEXT NOT NULL,
           phone TEXT DEFAULT '',
-          role TEXT DEFAULT '',
-          rate REAL DEFAULT 0,
-          notes TEXT DEFAULT ''
+          role TEXT DEFAULT ''
         )
+      `);
+      
+      // Add missing columns if they don't exist
+      await pool.query(`
+        ALTER TABLE staff ADD COLUMN IF NOT EXISTS rate REAL DEFAULT 0
+      `);
+      await pool.query(`
+        ALTER TABLE staff ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT ''
       `);
     } catch (e) {
       console.log('Table creation note:', e.message);
