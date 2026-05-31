@@ -1,47 +1,120 @@
 /**
  * Unified Calendar View Component
- * Displays events from both Google Calendar and Apple Calendar (via Nylas)
+ * Displays events from both Google Calendar (client-side OAuth) and Apple Calendar (via Nylas API)
  * Color-coded by source with event details
  */
 
 import React, { useState, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
+import { fetchGoogleCalendarEvents } from '../../lib/googleCalendar';
 
 const UnifiedCalendarView = () => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [googleStatus, setGoogleStatus] = useState({ connected: false, error: null });
-  const [appleStatus, setAppleStatus] = useState({ connected: false, error: null });
+  const [googleStatus, setGoogleStatus] = useState({ connected: false, error: null, count: 0 });
+  const [appleStatus, setAppleStatus] = useState({ connected: false, error: null, count: 0 });
+  const [googleToken, setGoogleToken] = useState(null);
 
   useEffect(() => {
-    fetchUnifiedCalendar();
+    // Try to get Google OAuth token from Firebase/auth
+    const getGoogleToken = async () => {
+      try {
+        // Dynamic import to avoid SSR issues
+        const { getAuth, onAuthStateChanged } = await import('firebase/auth');
+        const auth = getAuth();
+        
+        onAuthStateChanged(auth, async (user) => {
+          if (user) {
+            const token = await user.getIdToken();
+            setGoogleToken(token);
+            fetchUnifiedCalendar(token);
+          } else {
+            // No user signed in - try without token
+            fetchUnifiedCalendar(null);
+          }
+        });
+      } catch (err) {
+        console.error('Firebase auth error:', err);
+        fetchUnifiedCalendar(null);
+      }
+    };
+
+    getGoogleToken();
   }, []);
 
-  const fetchUnifiedCalendar = async () => {
+  const fetchUnifiedCalendar = async (googleToken) => {
     try {
       setLoading(true);
-      const response = await fetch('/api/calendar/unified');
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      let allEvents = [];
+      let googleEvents = [];
+      let appleEvents = [];
+
+      // ========== FETCH GOOGLE CALENDAR (client-side OAuth) ==========
+      if (googleToken) {
+        try {
+          const now = new Date();
+          const timeMin = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+          const timeMax = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString();
+          
+          const googleData = await fetchGoogleCalendarEvents(googleToken, timeMin, timeMax);
+          
+          googleEvents = (googleData || []).map(event => ({
+            id: event.id,
+            title: event.summary || 'Untitled Event',
+            start: event.start?.dateTime || event.start?.date || null,
+            end: event.end?.dateTime || event.end?.date || null,
+            description: event.description || '',
+            location: event.location || '',
+            calendar: 'Google Calendar',
+            calendarId: 'primary',
+            source: 'google',
+            sourceType: 'google',
+            color: '#4285F4'
+          }));
+
+          setGoogleStatus({ connected: true, error: null, count: googleEvents.length });
+        } catch (err) {
+          console.error('Google Calendar error:', err);
+          setGoogleStatus({ connected: false, error: err.message, count: 0 });
+        }
+      } else {
+        setGoogleStatus({ connected: false, error: 'No Google OAuth token. Sign in to view Google Calendar.', count: 0 });
       }
 
-      const data = await response.json();
+      // ========== FETCH APPLE CALENDAR (via Nylas API) ==========
+      try {
+        const response = await fetch('/api/calendar/unified');
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        setAppleStatus({
+          connected: data.apple?.connected || false,
+          error: data.apple?.error || null,
+          count: data.apple?.count || 0
+        });
+
+        appleEvents = data.apple?.events || [];
+      } catch (err) {
+        console.error('Apple Calendar error:', err);
+        setAppleStatus({ connected: false, error: err.message, count: 0 });
+      }
+
+      // ========== COMBINE & SORT ==========
+      allEvents = [...googleEvents, ...appleEvents];
       
-      setGoogleStatus({
-        connected: data.google?.connected || false,
-        error: data.google?.error || null,
-        count: data.google?.count || 0
+      // Sort by start date
+      allEvents.sort((a, b) => {
+        const dateA = new Date(a.start || 0);
+        const dateB = new Date(b.start || 0);
+        return dateA - dateB;
       });
 
-      setAppleStatus({
-        connected: data.apple?.connected || false,
-        error: data.apple?.error || null,
-        count: data.apple?.count || 0
-      });
-
-      setEvents(data.all || []);
+      setEvents(allEvents);
       setError(null);
     } catch (err) {
       console.error('Error fetching unified calendar:', err);
@@ -67,7 +140,7 @@ const UnifiedCalendarView = () => {
       case 'google':
         return 'Google';
       case 'apple':
-        return 'Apple';
+        return 'Apple (Nylas)';
       default:
         return 'Unknown';
     }
@@ -131,6 +204,11 @@ const UnifiedCalendarView = () => {
           </div>
           {appleStatus.error && (
             <p className="text-sm text-red-600 mt-2">{appleStatus.error}</p>
+          )}
+          {!appleStatus.connected && !appleStatus.error && (
+            <p className="text-sm text-gray-600 mt-2">
+              Connect iCloud at <a href="https://dashboard.nylas.com" target="_blank" className="text-blue-600 hover:underline">Nylas Dashboard</a>
+            </p>
           )}
         </div>
       </div>
@@ -198,7 +276,7 @@ const UnifiedCalendarView = () => {
       {/* Refresh Button */}
       <div className="mt-6 text-center">
         <button
-          onClick={fetchUnifiedCalendar}
+          onClick={() => fetchUnifiedCalendar(googleToken)}
           disabled={loading}
           className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
         >
