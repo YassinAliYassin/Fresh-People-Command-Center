@@ -42,22 +42,24 @@ function getTagContent(xml, tag) {
   return match ? match[1].trim() : '';
 }
 
-// CalDAV request helper
-function caldavRequest(url, body, depth, email, password) {
+// CalDAV request with timeout
+function caldavRequest(url, body, depth, email, password, timeoutMs) {
+  timeoutMs = timeoutMs || 10000; // 10 second timeout
   return new Promise((resolve, reject) => {
     const auth = 'Basic ' + Buffer.from(email + ':' + password).toString('base64');
     const urlObj = new URL(url);
     const options = {
       hostname: urlObj.hostname,
       port: urlObj.port || (urlObj.protocol === 'https:' ? 443 : 80),
-      path: urlObj.pathname + urlObj.search,
+      path: urlObj.pathname + (urlObj.search || ''),
       method: 'PROPFIND',
       headers: {
         'Depth': depth || '0',
         'Content-Type': 'application/xml',
         'Authorization': auth,
         'Content-Length': Buffer.byteLength(body)
-      }
+      },
+      timeout: timeoutMs
     };
     
     const lib = urlObj.protocol === 'https:' ? https : http;
@@ -74,6 +76,10 @@ function caldavRequest(url, body, depth, email, password) {
     });
     
     req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('Request timeout after ' + timeoutMs + 'ms'));
+    });
     req.write(body);
     req.end();
   });
@@ -87,9 +93,6 @@ module.exports = async (req, res) => {
   const email = process.env.ICLOUD_EMAIL;
   const appPassword = process.env.ICLOUD_APP_PASSWORD;
   
-  console.log('[Apple Calendar] Email set:', !!email);
-  console.log('[Apple Calendar] Password set:', !!appPassword);
-  
   if (!email || !appPassword) {
     return res.status(200).json({ connected: false, error: 'Missing credentials' });
   }
@@ -98,7 +101,7 @@ module.exports = async (req, res) => {
     // Step 1: Get principal
     const principalXml = await caldavRequest('https://caldav.icloud.com', 
       '<?xml version="1.0"?><propfind xmlns="DAV:"><prop><current-user-principal/></prop></propfind>', 
-      '0', email, appPassword);
+      '0', email, appPassword, 10000);
     
     const principalResponses = parseMultiStatus(principalXml);
     if (!principalResponses.length) throw new Error('No principal response');
@@ -112,8 +115,6 @@ module.exports = async (req, res) => {
     }
     if (!principalHref) throw new Error('No principal href');
     
-    console.log('[Apple Calendar] Principal:', principalHref);
-    
     // Step 2: Get calendar home
     const principalUrl = principalHref.startsWith('http') 
       ? principalHref 
@@ -121,7 +122,7 @@ module.exports = async (req, res) => {
     
     const homeXml = await caldavRequest(principalUrl, 
       '<?xml version="1.0"?><propfind xmlns="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav"><prop><C:calendar-home-set/></prop></propfind>', 
-      '0', email, appPassword);
+      '0', email, appPassword, 10000);
     
     const homeResponses = parseMultiStatus(homeXml);
     if (!homeResponses.length) throw new Error('No home response');
@@ -135,8 +136,6 @@ module.exports = async (req, res) => {
     }
     if (!calendarHome) throw new Error('No calendar home');
     
-    console.log('[Apple Calendar] Calendar home:', calendarHome);
-    
     // Step 3: List calendars
     const calendarsUrl = calendarHome.startsWith('http') 
       ? calendarHome 
@@ -144,7 +143,7 @@ module.exports = async (req, res) => {
     
     const calendarsXml = await caldavRequest(calendarsUrl, 
       '<?xml version="1.0"?><propfind xmlns="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav"><prop><displayname/><resourcetype/></prop></propfind>', 
-      '1', email, appPassword);
+      '1', email, appPassword, 15000);
     
     const calResponses = parseMultiStatus(calendarsXml);
     const calendars = calResponses
@@ -160,15 +159,12 @@ module.exports = async (req, res) => {
         timezone: 'UTC'
       }));
     
-    console.log('[Apple Calendar] Found', calendars.length, 'calendars');
-    
     return res.status(200).json({
       connected: true,
       user: maskEmail(email),
       calendars: calendars
     });
   } catch (error) {
-    console.error('[Apple Calendar] Error:', error.message);
     return res.status(200).json({
       connected: false,
       error: error.message,
