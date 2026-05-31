@@ -1,44 +1,68 @@
 /**
  * Unified Calendar View - SIMPLIFIED VERSION
- * Just renders Apple Calendar events (embedded JSON)
- * No Firebase, no async, no errors
+ * Renders Google and Apple Calendar events
+ * Props: googleEvents, appleEvents, currentYear, currentMonth, selectedDateStr
  */
 
 import React, { useState, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
 
-// Import Apple Calendar events (embedded at build time)
-import appleCalendarEvents from '../../data/apple-calendar-events.json';
-
-const UnifiedCalendarView = () => {
+const UnifiedCalendarView = ({ 
+  googleEvents = [], 
+  appleEvents = [], 
+  currentYear = 2026, 
+  currentMonth = 4, 
+  selectedDateStr = '2026-05-28' 
+}) => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('[UnifiedView] Loading Apple events...', appleCalendarEvents?.length);
+    console.log('[UnifiedView] Loading events...', {
+      googleCount: googleEvents?.length,
+      appleCount: appleEvents?.length,
+      currentYear,
+      currentMonth,
+      selectedDateStr
+    });
     
     try {
-      // Just load Apple events (no Google for now)
-      const appleEvents = (appleCalendarEvents || []).map((ev, index) => ({
-        id: ev.id || `apple-${index}`,
-        title: ev.title || 'Untitled Event',
-        start: ev.start || null,
-        end: ev.end || null,
-        description: ev.description || '',
-        location: ev.location || '',
-        calendar: 'iCloud Calendar',
-        source: 'apple',
-        color: '#34C759'
-      }));
+      // Combine Google and Apple events
+      const combinedEvents = [
+        // Format Google events
+        ...(googleEvents || []).map((ev, index) => ({
+          id: ev.id || `google-${index}`,
+          title: ev.title || ev.summary || 'Untitled Event',
+          start: ev.start?.dateTime || ev.start?.date || null,
+          end: ev.end?.dateTime || ev.end?.date || null,
+          description: ev.description || '',
+          location: ev.location || '',
+          calendar: 'Google Calendar',
+          source: 'google',
+          color: '#4285F4'
+        })),
+        // Format Apple events (use passed appleEvents or fallback to embedded)
+        ...(appleEvents || []).map((ev, index) => ({
+          id: ev.id || `apple-${index}`,
+          title: ev.title || 'Untitled Event',
+          start: ev.start || null,
+          end: ev.end || null,
+          description: ev.description || '',
+          location: ev.location || '',
+          calendar: 'iCloud Calendar',
+          source: 'apple',
+          color: '#34C759'
+        }))
+      ];
       
-      console.log(`[UnifiedView] Loaded ${appleEvents.length} Apple events`);
-      setEvents(appleEvents);
+      console.log(`[UnifiedView] Loaded ${combinedEvents.length} total events (${googleEvents?.length || 0} Google, ${appleEvents?.length || 0} Apple)`);
+      setEvents(combinedEvents);
     } catch (err) {
       console.error('[UnifiedView] Error:', err);
     }
     
     setLoading(false);
-  }, []);
+  }, [googleEvents, appleEvents, currentYear, currentMonth, selectedDateStr]);
 
   const formatEventDate = (dateStr) => {
     if (!dateStr) return 'No date';
