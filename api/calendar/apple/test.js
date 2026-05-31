@@ -1,52 +1,61 @@
 export default async function handler(req, res) {
+  // Only allow GET requests
+  if (req.method !== 'GET') {
+    return res.status(405).json({ 
+      connected: false, 
+      error: 'Method not allowed. Use GET.' 
+    });
+  }
+
   try {
-    // Test if Vercel can reach the VPS
-    const tests = [
-      {
-        name: 'VPS HTTP',
-        url: 'http://solidai.solidsolutions.africa/apple-calendar/api/calendar/apple/test'
-      },
-      {
-        name: 'VPS HTTPS',
-        url: 'https://solidai.solidsolutions.africa/apple-calendar/api/calendar/apple/test'
-      }
-    ];
+    // Call the Apple Calendar API server on VPS
+    const apiUrl = process.env.APPLE_CALENDAR_API_URL 
+      || 'https://solidai.solidsolutions.africa/apple-calendar/api/calendar/apple/test';
     
-    const results = [];
-    for (const test of tests) {
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000);
-        
-        const response = await fetch(test.url, {
-          method: 'GET',
-          signal: controller.signal
-        });
-        clearTimeout(timeout);
-        
-        results.push({
-          name: test.name,
-          status: response.status,
-          ok: response.ok,
-          url: test.url
-        });
-      } catch (e) {
-        results.push({
-          name: test.name,
-          error: e.name === 'AbortError' ? 'Timeout after 10s' : e.message,
-          url: test.url
-        });
-      }
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Fresh-People-Command-Center'
+      },
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeout);
+    
+    if (!response.ok) {
+      throw new Error(`VPS API returned ${response.status}: ${response.statusText}`);
     }
     
-    return res.status(200).json({
-      tests: results,
-      hint: 'Testing if Vercel can reach VPS'
-    });
+    const result = await response.json();
+    
+    // Log success (mask secrets)
+    console.log('[Apple Calendar] Connected:', result.connected);
+    console.log('[Apple Calendar] User:', result.user);
+    console.log('[Apple Calendar] Calendars:', result.calendars?.length || 0);
+    
+    return res.status(200).json(result);
   } catch (error) {
+    console.error('[Apple Calendar] Error:', error.message);
+    
+    // Check if it's a timeout
+    const isTimeout = error.name === 'AbortError';
+    const errorMsg = isTimeout 
+      ? 'Request to Apple Calendar API timed out after 30s' 
+      : `Failed to reach Apple Calendar API: ${error.message}`;
+    
     return res.status(200).json({
-      error: error.message,
-      stack: error.stack
+      connected: false,
+      error: errorMsg,
+      calendars: [],
+      debug: {
+        apiUrl: process.env.APPLE_CALENDAR_API_URL || 'default VPS endpoint',
+        errorType: error.name || 'unknown'
+      }
     });
   }
 }
