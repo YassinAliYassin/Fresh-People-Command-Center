@@ -5,6 +5,10 @@ import UnifiedCalendarView from './Calendar/UnifiedView';
 // Import full Apple Calendar events (1457 events from iCloud feed)
 import appleCalendarEvents from '../data/apple-calendar-events.json';
 
+// Firebase & Google Calendar integration
+import { googleSignIn, getAccessToken, logoutGoogle, initAuth } from '../lib/firebase';
+import { fetchGoogleCalendarEvents } from '../lib/googleCalendar';
+
 // Types
 interface Client {
   id: string;
@@ -73,6 +77,18 @@ const Dashboard: React.FC = () => {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [events, setEventsState] = useState<Event[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Filtered data based on search
+  const filteredClients = clients.filter(c => 
+    c.name?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  const filteredVenues = venues.filter(v => 
+    v.name?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  const filteredStaff = staff.filter(s => 
+    s.name?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   // Active Tab for Registry List Left Panel
   const [activeTab, setActiveTab] = useState<'clients' | 'venues' | 'staff'>('clients');
@@ -138,7 +154,42 @@ const Dashboard: React.FC = () => {
   const [simNewTimeStart, setSimNewTimeStart] = useState('12:00');
   const [simNewTimeEnd, setSimNewTimeEnd] = useState('14:00');
   const [simNewNotes, setSimNewNotes] = useState('');
-  const [appleEvents, setAppleEvents] = useState<Event[]>(appleCalendarEvents as Event[]);
+  const [appleEvents, setAppleEvents] = useState<any[]>(appleCalendarEvents);
+
+  // Fetch real-time data from API routes
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [clientsRes, venuesRes, staffRes, eventsRes] = await Promise.all([
+          fetch('/api/clients'),
+          fetch('/api/venues'),
+          fetch('/api/staff'),
+          fetch('/api/events')
+        ]);
+        
+        if (clientsRes.ok) {
+          const data = await clientsRes.json();
+          setClients(data);
+        }
+        if (venuesRes.ok) {
+          const data = await venuesRes.json();
+          setVenues(data);
+        }
+        if (staffRes.ok) {
+          const data = await staffRes.json();
+          setStaff(data);
+        }
+        if (eventsRes.ok) {
+          const data = await eventsRes.json();
+          setEventsState(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch data:', error);
+      }
+    };
+    
+    fetchData();
+  }, []);
 
   // Calendar view toggle
   const [showCalendar, setShowCalendar] = useState(false);
@@ -221,6 +272,14 @@ const Dashboard: React.FC = () => {
           {/* Left Panel - Registry */}
           <div className="lg:col-span-1">
             <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+              {/* Search Input */}
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-700 focus:outline-none focus:border-blue-500 mb-4"
+              />
               <div className="flex gap-2 mb-4">
                 <button
                   onClick={() => setActiveTab('clients')}
@@ -242,9 +301,9 @@ const Dashboard: React.FC = () => {
                 </button>
               </div>
               <div className="text-gray-400 text-sm">
-                {activeTab === 'clients' && `Total Clients: ${clients.length}`}
-                {activeTab === 'venues' && `Total Venues: ${venues.length}`}
-                {activeTab === 'staff' && `Total Staff: ${staff.length}`}
+                {activeTab === 'clients' && `Total Clients: ${filteredClients.length}`}
+                {activeTab === 'venues' && `Total Venues: ${filteredVenues.length}`}
+                {activeTab === 'staff' && `Total Staff: ${filteredStaff.length}`}
               </div>
             </div>
           </div>
