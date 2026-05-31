@@ -88,17 +88,23 @@ const getMultiplier = (region, pricingTier, availabilityStatus) => {
 };
 
 // CREATE event
-app.post('/api/events', (req, res) => {
+app.post('/api/events', async (req, res) => {
   const { 
     id, title, date, duration, staff_assigned, dressCode, uniformType, arrivalTime, 
     staffPhone, staffEmail, clientID, clientBudget, clientName, clientPhone, clientEmail,
     miscExpenses, region, pricing_tier, availability_status, base_price 
   } = req.body;
   
+  // Validate required fields
+  if (!title || !date) {
+    return res.status(400).json({ error: 'Title and date are required' });
+  }
+
   // Calculate multiplier
   const multiplier = getMultiplier(region || 'ZA-GP', pricing_tier || 'Standard', availability_status || 'Available');
   
   const sql = `INSERT INTO events (id, title, date, duration, staffName, dressCode, uniformType, arrivalTime, staffPhone, staffEmail, clientID, clientBudget, clientName, clientPhone, clientEmail, misc_expenses, region, pricing_tier, availability_status, base_price, multiplier) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  
   db.run(sql, [
     id,
     title,
@@ -121,7 +127,7 @@ app.post('/api/events', (req, res) => {
     availability_status || 'Available',
     base_price || 0,
     multiplier
-  ], function(err) {
+  ], async function(err) {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -131,16 +137,23 @@ app.post('/api/events', (req, res) => {
     const formattedDate = eventDate.toLocaleDateString('en-ZA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const formattedTime = eventDate.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
     
+    const whatsappResults = [];
+    
     // Process staff assignments and send WhatsApp notifications
     if (Array.isArray(staff_assigned) && staff_assigned.length > 0) {
       // Fetch staff details for assigned staff
       const staffPlaceholders = staff_assigned.map(() => '?').join(',');
       const fetchStaffSql = `SELECT id, fullName, phone FROM staff WHERE fullName IN (${staffPlaceholders})`;
       
-      db.all(fetchStaffSql, staff_assigned, (err, staffRows) => {
+      db.all(fetchStaffSql, staff_assigned, async (err, staffRows) => {
         if (err) {
           console.error('Failed to fetch staff for event:', err);
-          return res.status(201).json({ message: 'Event created', id: eventId, warning: 'WhatsApp notifications failed: staff lookup error' });
+          return res.status(201).json({ 
+            message: 'Event created', 
+            id: eventId, 
+            whatsapp: [],
+            warning: 'WhatsApp notifications failed: staff lookup error' 
+          });
         }
         
         // Insert staff assignments
@@ -148,16 +161,31 @@ app.post('/api/events', (req, res) => {
           db.run('INSERT INTO staff_assignments (eventId, staffId) VALUES (?, ?)', [eventId, staff.id], (err) => {
             if (err) console.error('Failed to assign staff:', err);
           });
+        });
+        
+        // Send WhatsApp notifications and track results
+        const token = process.env.WHATSAPP_ACCESS_TOKEN;
+        const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+        
+        for (const staff of staffRows) {
+          if (!token || !phoneId || !staff.phone) {
+            whatsappResults.push({ 
+              staff: staff.fullName, 
+              phone: staff.phone || 'No phone', 
+              sent: false, 
+              error: !token ? 'Missing WhatsApp token' : !phoneId ? 'Missing phone ID' : 'No staff phone' 
+            });
+            continue;
+          }
           
-          // Send WhatsApp notification
-          const token = process.env.WHATSAPP_ACCESS_TOKEN;
-          const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-          const staffPhone = staff.phone;
+          // Format phone to E.164 (remove spaces, ensure + prefix)
+          const formattedPhone = staff.phone.replace(/\s+/g, '');
+          const e164Phone = formattedPhone.startsWith('+') ? formattedPhone : `+${formattedPhone}`;
           
-          if (token && phoneId && staffPhone) {
-            const message = `🎉 New Event Assignment!\n\nEvent: ${title}\nDate: ${formattedDate}\nTime: ${formattedTime}\nDuration: ${duration || 4} hours\nArrival Time: ${arrivalTime || 'Not specified'}\nDress Code: ${dressCode || 'All Black'}\nClient: ${clientName || 'Not specified'}\n\nPlease confirm your availability.`;
-            
-            fetch(`https://graph.facebook.com/v18.0/${phoneId}/messages`, {
+          const message = `🎉 New Event Assignment!\n\nEvent: ${title}\nDate: ${formattedDate}\nTime: ${formattedTime}\nDuration: ${duration || 4} hours\nArrival Time: ${arrivalTime || 'Not specified'}\nDress Code: ${dressCode || 'All Black'}\nClient: ${clientName || 'Not specified'}\n\nPlease confirm your availability.`;
+          
+          try {
+            const response = await fetch(`https://graph.facebook.com/v19.0/${phoneId}/messages`, {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -165,23 +193,52 @@ app.post('/api/events', (req, res) => {
               },
               body: JSON.stringify({
                 messaging_product: 'whatsapp',
-                to: staffPhone,
+                to: e164Phone,
                 text: { body: message }
               })
-            }).then(response => {
-              if (!response.ok) {
-                console.error(`WhatsApp send failed to ${staff.fullName}:`, response.statusText);
-              } else {
-                console.log(`WhatsApp sent to ${staff.fullName} (${staffPhone})`);
-              }
-            }).catch(err => console.error(`WhatsApp send failed to ${staff.fullName}:`, err));
+            });
+            
+            const responseData = await response.json();
+            
+            if (!response.ok) {
+              console.error(`WhatsApp send failed to ${staff.fullName}:`, responseData.error?.message || response.statusText);
+              whatsappResults.push({ 
+                staff: staff.fullName, 
+                phone: e164Phone, 
+                sent: false, 
+                error: responseData.error?.message || response.statusText 
+              });
+            } else {
+              console.log(`WhatsApp sent to ${staff.fullName} (${e164Phone})`);
+              whatsappResults.push({ 
+                staff: staff.fullName, 
+                phone: e164Phone, 
+                sent: true 
+              });
+            }
+          } catch (err) {
+            console.error(`WhatsApp send failed to ${staff.fullName}:`, err);
+            whatsappResults.push({ 
+              staff: staff.fullName, 
+              phone: e164Phone, 
+              sent: false, 
+              error: err.message 
+            });
           }
-        });
+        }
         
-        res.status(201).json({ message: 'Event created', id: eventId });
+        res.status(201).json({ 
+          message: 'Event created', 
+          id: eventId, 
+          whatsapp: whatsappResults 
+        });
       });
     } else {
-      res.status(201).json({ message: 'Event created', id: eventId });
+      res.status(201).json({ 
+        message: 'Event created', 
+        id: eventId, 
+        whatsapp: [] 
+      });
     }
   });
 });
