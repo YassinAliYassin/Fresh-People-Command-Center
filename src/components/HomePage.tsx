@@ -25,6 +25,11 @@ const HomePage = () => {
   const [currentMonth, setCurrentMonth] = useState<number>(4); // 0-indexed: 4 = May
   const [selectedDateStr, setSelectedDateStr] = useState<string>('2026-05-28');
 
+  // Log apple events count on mount
+  useEffect(() => {
+    console.log('[HomePage] Apple events loaded:', appleEvents?.length || 0);
+  }, []);
+
   // Fetch today's events
   useEffect(() => {
     const fetchTodaysEvents = async () => {
