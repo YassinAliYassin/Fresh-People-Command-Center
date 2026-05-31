@@ -1,6 +1,6 @@
-const { testConnection } = require('../../lib/calendar/apple');
+import { testConnection } from '../../lib/calendar/apple/index.js';
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   // Only allow GET requests
   if (req.method !== 'GET') {
     return res.status(405).json({ 
@@ -22,7 +22,7 @@ module.exports = async (req, res) => {
     
     return res.status(500).json({
       connected: false,
-      error: 'Internal server error during connection test',
+      error: 'Internal server error during connection test'
     });
   }
-};
+}
