@@ -1,7 +1,7 @@
 /**
  * Unified Calendar API
- * Fetches events from both Google Calendar and Apple Calendar (via Nylas)
- * Combined, sorted events for unified view
+ * Provides Apple Calendar events via Nylas (serverless)
+ * Google Calendar is handled client-side via OAuth (see /src/lib/googleCalendar.ts)
  */
 
 export default async function handler(req, res) {
@@ -12,99 +12,19 @@ export default async function handler(req, res) {
     });
   }
 
-  const results = {
-    google: { connected: false, events: [], error: null, calendars: [], count: 0 },
-    apple: { connected: false, events: [], error: null, calendars: [], count: 0 },
-    all: [],
-    totalCount: 0,
-    timestamp: new Date().toISOString()
-  };
-
   try {
-    // ========== GOOGLE CALENDAR ==========
-    try {
-      const serviceAccountBase64 = process.env.GOOGLE_SERVICE_ACCOUNT_BASE64;
-      
-      if (!serviceAccountBase64) {
-        results.google.error = 'GOOGLE_SERVICE_ACCOUNT_BASE64 not set';
-      } else {
-        // Decode and parse service account
-        const serviceAccountJson = Buffer.from(serviceAccountBase64, 'base64').toString('utf8');
-        const serviceAccount = JSON.parse(serviceAccountJson);
-        
-        // Import googleapis
-        const { google } = await import('googleapis');
-        
-        // Create JWT client with proper scopes
-        const jwtClient = new google.auth.JWT({
-          email: serviceAccount.client_email,
-          key: serviceAccount.private_key,
-          scopes: ['https://www.googleapis.com/auth/calendar.readonly']
-        });
-        
-        // Authorize
-        const tokens = await jwtClient.authorize();
-        
-        // Create calendar client
-        const calendar = google.calendar({ 
-          version: 'v3', 
-          auth: jwtClient 
-        });
-        
-        // Get calendar list
-        const calendarListResponse = await calendar.calendarList.list({ maxResults: 50 });
-        const calendars = calendarListResponse.data.items || [];
-        
-        // Fetch events from all calendars
-        const now = new Date();
-        const timeMin = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
-        const timeMax = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString();
-        
-        let allGoogleEvents = [];
-        
-        for (const cal of calendars) {
-          try {
-            const eventsResponse = await calendar.events.list({
-              calendarId: cal.id,
-              timeMin: timeMin,
-              timeMax: timeMax,
-              maxResults: 250,
-              singleEvents: true,
-              orderBy: 'startTime'
-            });
-            
-            const events = (eventsResponse.data.items || []).map(event => ({
-              id: event.id,
-              title: event.summary || 'Untitled Event',
-              start: event.start?.dateTime || event.start?.date || null,
-              end: event.end?.dateTime || event.end?.date || null,
-              description: event.description || '',
-              location: event.location || '',
-              calendar: cal.summary || 'Unknown Calendar',
-              calendarId: cal.id,
-              source: 'google',
-              sourceType: 'google',
-              color: '#4285F4'
-            }));
-            
-            allGoogleEvents.push(...events);
-          } catch (e) {
-            console.error(`[Google] Error fetching ${cal.summary}:`, e.message);
-          }
-        }
-        
-        results.google = {
-          connected: true,
-          events: allGoogleEvents,
-          error: null,
-          calendars: calendars.map(c => ({ id: c.id, name: c.summary })),
-          count: allGoogleEvents.length
-        };
-      }
-    } catch (error) {
-      console.error('[Unified] Google Calendar error:', error.message);
-      results.google.error = `Google Calendar error: ${error.message}`;
-    }
+    const result = {
+      google: { 
+        connected: false, 
+        events: [], 
+        error: 'Google Calendar fetched client-side via OAuth. See /src/lib/googleCalendar.ts',
+        note: 'Use browser OAuth token to fetch Google Calendar events directly.'
+      },
+      apple: { connected: false, events: [], error: null, calendars: [], count: 0 },
+      all: [],
+      totalCount: 0,
+      timestamp: new Date().toISOString()
+    };
 
     // ========== APPLE CALENDAR (via Nylas) ==========
     try {
@@ -112,7 +32,8 @@ export default async function handler(req, res) {
       const nylasGrantId = process.env.NYLAS_GRANT_ID;
       
       if (!nylasApiKey || !nylasGrantId) {
-        results.apple.error = 'Nylas API key or Grant ID not configured. Connect iCloud at: https://dashboard.nylas.com';
+        result.apple.error = 'Nylas not configured. Connect iCloud at: https://dashboard.nylas.com';
+        result.apple.setupUrl = 'https://dashboard.nylas.com';
       } else {
         // Fetch calendars from Nylas
         const calendarsResponse = await fetch(
@@ -134,7 +55,7 @@ export default async function handler(req, res) {
         const calendarsData = await calendarsResponse.json();
         const calendars = calendarsData.data || [];
         
-        // Fetch events from all calendars
+        // Fetch events from all calendars (last 30 days to next 90 days)
         const now = new Date();
         const startTime = Math.floor((now.getTime() - 30 * 24 * 60 * 60 * 1000) / 1000);
         const endTime = Math.floor((now.getTime() + 90 * 24 * 60 * 60 * 1000) / 1000);
@@ -176,7 +97,7 @@ export default async function handler(req, res) {
           }
         }
         
-        results.apple = {
+        result.apple = {
           connected: true,
           events: allAppleEvents,
           error: null,
@@ -186,33 +107,21 @@ export default async function handler(req, res) {
       }
     } catch (error) {
       console.error('[Unified] Apple Calendar (Nylas) error:', error.message);
-      results.apple.error = `Nylas error: ${error.message}`;
+      result.apple.error = error.message;
     }
 
-    // ========== COMBINE & SORT ==========
-    const allEvents = [
-      ...(results.google.events || []),
-      ...(results.apple.events || [])
-    ];
+    // ========== COMBINE (Apple events only - Google fetched client-side) ==========
+    result.all = result.apple.events || [];
+    result.totalCount = result.all.length;
     
-    // Sort by start date
-    allEvents.sort((a, b) => {
-      const dateA = new Date(a.start || 0);
-      const dateB = new Date(b.start || 0);
-      return dateA - dateB;
-    });
-    
-    results.all = allEvents;
-    results.totalCount = allEvents.length;
-    
-    return res.status(200).json(results);
+    return res.status(200).json(result);
     
   } catch (error) {
     console.error('[Unified Calendar] Error:', error.message);
     return res.status(500).json({
       error: `Unified Calendar error: ${error.message}`,
-      google: results.google,
-      apple: results.apple,
+      google: { connected: false, events: [], error: 'Failed to fetch' },
+      apple: { connected: false, events: [], error: 'Failed to fetch' },
       all: []
     });
   }
