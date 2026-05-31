@@ -13,7 +13,7 @@ export default async function handler(req, res) {
       idleTimeoutMillis: 100
     });
     
-    // Create tables if not exists
+    // Create tables if not exists and add missing columns
     try {
       await pool.query(`
         CREATE TABLE IF NOT EXISTS events (
@@ -21,13 +21,15 @@ export default async function handler(req, res) {
           title TEXT,
           date TEXT,
           duration INTEGER,
-          staff_assigned TEXT,
-          dressCode TEXT,
-          arrivalTime TEXT,
-          clientName TEXT,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          staff_assigned TEXT
         )
       `);
+      
+      // Add missing columns if they don't exist
+      await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS dressCode TEXT DEFAULT ''`);
+      await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS arrivalTime TEXT DEFAULT ''`);
+      await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS clientName TEXT DEFAULT ''`);
+      await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
     } catch (e) {
       console.log('Table creation note:', e.message);
     }
