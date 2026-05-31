@@ -1,18 +1,21 @@
 /**
  * Unified Calendar View - Google + Apple Calendars
- * Uses: Google OAuth + static Apple Calendar JSON (fetched at runtime)
+ * Uses: Google OAuth + Apple Calendar JSON (embedded at build time)
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { format, parseISO } from 'date-fns';
 import { fetchGoogleCalendarEvents } from '../../lib/googleCalendar';
 
+// Import Apple Calendar events (embedded at build time)
+import appleCalendarEvents from '../../data/apple-calendar-events.json';
+
 const UnifiedCalendarView = () => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [googleStatus, setGoogleStatus] = useState({ connected: false, count: 0, error: null });
-  const [appleStatus, setAppleStatus] = useState({ connected: false, count: 0, error: null });
+  const [appleStatus, setAppleStatus] = useState({ connected: true, count: 0, error: null });
   const [selectedSource, setSelectedSource] = useState('all');
 
   useEffect(() => {
@@ -27,21 +30,18 @@ const UnifiedCalendarView = () => {
     let googleEvents = [];
     let appleEvents = [];
 
-    // 1. Load Apple Calendar events (fetch static JSON at runtime)
+    // 1. Load Apple Calendar events (from embedded JSON)
     try {
-      console.log('[Apple Calendar] Fetching static JSON...');
-      const response = await fetch('/data/apple-calendar-events.json');
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      console.log('[Apple Calendar] Loading from embedded JSON...', appleCalendarEvents?.length);
       
-      const appleCalendarEvents = await response.json();
-      
-      if (!Array.isArray(appleCalendarEvents)) {
+      // Validate data
+      if (!appleCalendarEvents || !Array.isArray(appleCalendarEvents)) {
         throw new Error('Apple events data is not an array');
       }
       
-      appleEvents = appleCalendarEvents.map(ev => ({
-        id: ev.id || `apple-${Math.random()}`,
-        title: ev.title || 'Untitled',
+      appleEvents = appleCalendarEvents.map((ev, index) => ({
+        id: ev.id || `apple-${index}-${Date.now()}`,
+        title: ev.title || 'Untitled Event',
         start: ev.start || null,
         end: ev.end || null,
         description: ev.description || '',
@@ -261,8 +261,8 @@ const UnifiedCalendarView = () => {
           Refresh Google Calendar
         </button>
         <p className="text-xs text-gray-500 mt-2">
-          Apple Calendar: {appleStatus.count} events (static JSON). 
-          Re-run `node scripts/fetch-apple-calendar.cjs` to refresh.
+          Apple Calendar: {appleStatus.count} events (embedded in build). 
+          Re-run build script to refresh.
         </p>
       </div>
     </div>
