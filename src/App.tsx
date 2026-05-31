@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
-import { Calendar, Users, UserCog, Combine } from 'lucide-react';
+import { Calendar, Users, UserCog, Combine, LayoutDashboard } from 'lucide-react';
 import EventForm from './components/EventForm';
 import EventList from './components/EventList';
 import CalendarView from './components/CalendarView';
 import StaffView from './components/StaffView';
 import HomePage from './components/HomePage';
 import UnifiedCalendarView from './components/Calendar/UnifiedView';
+import Dashboard from './components/Dashboard';
 
 // Persistent Navigation - Fixed bottom on mobile, top on desktop
 const Navbar = () => {
@@ -14,6 +15,13 @@ const Navbar = () => {
     <nav className="bg-gray-900 border-t border-gray-800 fixed bottom-0 left-0 right-0 z-40 sm:static sm:border-t-0 sm:border-b sm:bottom-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-around sm:justify-start sm:space-x-8 h-16 items-center">
+          <Link
+            to="/"
+            className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+          >
+            <LayoutDashboard size={20} />
+            <span className="text-xs sm:text-sm">Dashboard</span>
+          </Link>
           <Link
             to="/events"
             className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
@@ -67,7 +75,7 @@ function App() {
             </div>
 
             <Routes>
-              <Route path="/" element={<HomePage />} />
+              <Route path="/" element={<Dashboard />} />
               <Route
                 path="/events"
                 element={
