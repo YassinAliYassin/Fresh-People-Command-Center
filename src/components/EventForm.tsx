@@ -40,14 +40,15 @@ const [whatsappResults, setWhatsappResults] = useState<Array<{ staff: string; ph
     setEvent(prev => ({ ...prev, [field]: value }));
   };
 
-const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     setWhatsappResults([]);
     
     // FIX: Read date directly from input if event.date is undefined
-    const dateValue = event.date || document.querySelector('input[type="datetime-local"]')?.value || '';
+    const dateInput = document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
+    const dateValue = event.date || dateInput?.value || '';
     if (!dateValue) {
       setError('Please select event date & time');
       setLoading(false);
