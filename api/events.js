@@ -13,7 +13,7 @@ export default async function handler(req, res) {
       idleTimeoutMillis: 100
     });
     
-    // Create tables if not exists and add missing columns
+    // Create table if not exists (original schema only)
     try {
       await pool.query(`
         CREATE TABLE IF NOT EXISTS events (
@@ -24,12 +24,6 @@ export default async function handler(req, res) {
           staff_assigned TEXT
         )
       `);
-      
-      // Add missing columns if they don't exist
-      await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS dressCode TEXT DEFAULT ''`);
-      await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS arrivalTime TEXT DEFAULT ''`);
-      await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS clientName TEXT DEFAULT ''`);
-      await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
     } catch (e) {
       console.log('Table creation note:', e.message);
     }
@@ -53,10 +47,10 @@ export default async function handler(req, res) {
       }
       
       if (req.method === 'PATCH') {
-        const { title, date, duration, staff_assigned, dressCode, arrivalTime } = req.body;
+        const { title, date, duration, staff_assigned } = req.body;
         await pool.query(
-          'UPDATE events SET title=$1, date=$2, duration=$3, staff_assigned=$4, dressCode=$5, arrivalTime=$6 WHERE id=$7',
-          [title, date, duration, JSON.stringify(staff_assigned), dressCode, arrivalTime, id]
+          'UPDATE events SET title=$1, date=$2, duration=$3, staff_assigned=$4 WHERE id=$5',
+          [title, date, duration, JSON.stringify(staff_assigned), id]
         );
         await pool.end();
         return res.json({ id, message: 'Event updated successfully' });
@@ -84,18 +78,18 @@ export default async function handler(req, res) {
     }
     
     if (req.method === 'POST') {
-      const { id, title, date, duration, staff_assigned, dressCode, arrivalTime, clientName, sendWhatsApp } = req.body;
+      const { id, title, date, duration, staff_assigned, sendWhatsApp } = req.body;
       
       await pool.query(
-        'INSERT INTO events (id, title, date, duration, staff_assigned, dressCode, arrivalTime, clientName) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-        [id, title, date, duration, JSON.stringify(staff_assigned), dressCode, arrivalTime, clientName]
+        'INSERT INTO events (id, title, date, duration, staff_assigned) VALUES ($1, $2, $3, $4, $5)',
+        [id, title, date, duration, JSON.stringify(staff_assigned)]
       );
       
       // Send WhatsApp notifications if requested
       let whatsappResults = [];
       if (sendWhatsApp && staff_assigned && staff_assigned.length > 0) {
         const eventDate = new Date(date);
-        const whatsappMessage = `📅 NEW BOOKING ASSIGNED\n\nEvent: ${title}\nDate: ${eventDate.toLocaleDateString()}\nTime: ${eventDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}\nDuration: ${duration || 4}hrs\nArrival: ${arrivalTime || '1hr before'}\nDress: ${dressCode || 'Formal All Black'}\nClient: ${clientName || 'TBD'}\n\nPlease confirm availability. Thank you!`;
+        const whatsappMessage = `📅 NEW BOOKING ASSIGNED\n\nEvent: ${title}\nDate: ${eventDate.toLocaleDateString()}\nTime: ${eventDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}\nDuration: ${duration || 4}hrs\n\nPlease confirm availability. Thank you!`;
         
         for (const staffName of staff_assigned) {
           const staffResult = await pool.query('SELECT phone FROM staff WHERE name = $1', [staffName]);
