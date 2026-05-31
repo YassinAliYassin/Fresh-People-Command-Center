@@ -1,16 +1,28 @@
-import { Pool } from 'pg';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
-
 export default async function handler(req, res) {
   const format = req.query.format || 'ics';
   
   try {
+    // Dynamic import for pg (serverless-compatible)
+    const { Pool } = await import('pg');
+    
+    if (!process.env.DATABASE_URL) {
+      return res.status(500).json({ error: 'DATABASE_URL not set' });
+    }
+    
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false },
+      max: 1,
+      idleTimeoutMillis: 100
+    });
+    
     // Fetch local events from database
-    const eventsResult = await pool.query('SELECT * FROM events ORDER BY date ASC').catch(() => ({ rows: [] }));
+    let eventsResult = { rows: [] };
+    try {
+      eventsResult = await pool.query('SELECT * FROM events ORDER BY date ASC');
+    } catch (e) {
+      console.log('[Calendar] DB query failed:', e.message);
+    }
     
     // Fetch from iCloud calendar
     let iCloudEvents = [];
@@ -18,13 +30,21 @@ export default async function handler(req, res) {
     
     if (iCloudUrl) {
       try {
-        const response = await fetch(iCloudUrl);
-        const icsText = await response.text();
-        iCloudEvents = parseICS(icsText);
+        const response = await fetch(iCloudUrl, { 
+          headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+        if (response.ok) {
+          const icsText = await response.text();
+          iCloudEvents = parseICS(icsText);
+        } else {
+          console.log('[Calendar] iCloud fetch failed:', response.status);
+        }
       } catch (e) {
-        console.log('[Calendar] iCloud fetch failed:', e.message);
+        console.log('[Calendar] iCloud fetch error:', e.message);
       }
     }
+    
+    await pool.end();
     
     // If JSON format requested (for frontend calendar UI)
     if (format === 'json') {
@@ -34,9 +54,9 @@ export default async function handler(req, res) {
         start: event.date,
         end: new Date(new Date(event.date).getTime() + (event.duration || 4) * 60 * 60 * 1000).toISOString(),
         source: 'local',
-        staff_assigned: event.staffname || '',
-        dressCode: event.uniformtype || 'Formal All Black',
-        clientName: event.clientname || ''
+        staff_assigned: event.staff_assigned || '',
+        dressCode: 'Formal All Black',
+        clientName: ''
       }));
       
       return res.status(200).json({
@@ -75,7 +95,7 @@ function parseICS(icsText) {
           start: currentEvent.dtstart,
           end: currentEvent.dtend || currentEvent.dtstart,
           source: 'icloud',
-          staff_assigned: currentEvent.attendees || '',
+          staff_assigned: '',
           dressCode: 'Formal All Black',
           clientName: ''
         });
