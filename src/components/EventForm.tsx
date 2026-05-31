@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CalendarPlus, User, Clock, CheckCircle, MessageSquare } from 'lucide-react';
 import { BackendEvent } from '../types';
 
@@ -20,7 +20,8 @@ const EventForm: React.FC<{ onEventCreated?: () => void }> = ({ onEventCreated }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-const [whatsappResults, setWhatsappResults] = useState<Array<{ staff: string; phone?: string; sent: boolean }>>([]);
+  const [whatsappResults, setWhatsappResults] = useState<Array<{ staff: string; phone?: string; sent: boolean }>>([]);
+  const dateRef = useRef<HTMLInputElement>(null);
 
   // Fetch staff from API
   useEffect(() => {
@@ -46,9 +47,10 @@ const [whatsappResults, setWhatsappResults] = useState<Array<{ staff: string; ph
     setError('');
     setWhatsappResults([]);
     
-    // FIX: Read date directly from input if event.date is undefined
-    const dateInput = document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
-    const dateValue = event.date || dateInput?.value || '';
+    // FIX: Always read date from ref (works for both manual input and programmatic changes)
+    const dateValue = event.date || dateRef.current?.value || '';
+    console.log('EventForm: Submitting with dateValue:', dateValue, 'event.date:', event.date);
+    
     if (!dateValue) {
       setError('Please select event date & time');
       setLoading(false);
@@ -149,6 +151,7 @@ const [whatsappResults, setWhatsappResults] = useState<Array<{ staff: string; ph
         <div>
           <label className="block text-sm font-medium text-gray-400 mb-1">Event Date & Time</label>
           <input
+            ref={dateRef}
             type="datetime-local"
             value={event.date || ''}
             onChange={e => handleChange('date', e.target.value)}
