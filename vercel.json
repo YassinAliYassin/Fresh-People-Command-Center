@@ -1,18 +1,12 @@
 {
-  "crons": [
-    {
-      "path": "/api/sync-icloud",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/daily-report",
-      "schedule": "0 7 * * *"
-    }
-  ],
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
       "source": "/(.*)",
-      "destination": "/$1"
+      "destination": "/index.html"
     }
   ]
 }
