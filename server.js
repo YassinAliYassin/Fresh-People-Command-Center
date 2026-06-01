@@ -816,6 +816,100 @@ END:VCALENDAR`;
   });
 });
 
+// ==================
+// DISPATCH STAFF - Send WhatsApp notifications
+// ==================
+
+app.post('/api/dispatch-staff', (req, res) => {
+  const { eventId, staffIds } = req.body;
+  
+  if (!eventId || !staffIds || !Array.isArray(staffIds)) {
+    return res.status(400).json({ error: 'eventId and staffIds array required' });
+  }
+
+  // Fetch event details
+  db.get('SELECT * FROM events WHERE id = ?', [eventId], (err, event) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!event) return res.status(404).json({ error: 'Event not found' });
+
+    // Fetch staff details
+    const placeholders = staffIds.map(() => '?').join(',');
+    db.all(`SELECT * FROM staff WHERE id IN (${placeholders})`, staffIds, (err, staffList) => {
+      if (err) return res.status(500).json({ error: err.message });
+
+      const token = process.env.WHATSAPP_ACCESS_TOKEN;
+      const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+      const results = [];
+
+      // Send WhatsApp to each staff
+      let completed = 0;
+      staffList.forEach(staff => {
+        if (!staff.phone || !token || !phoneId) {
+          results.push({ staffId: staff.id, staffName: staff.fullName, status: 'skipped' });
+          completed++;
+          return;
+        }
+
+        const message = `📅 *EVENT ASSIGNMENT*
+
+🎫 *Event:* ${event.title}
+📅 *Date:* ${new Date(event.date).toLocaleDateString('en-ZA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+🕐 *Time:* ${new Date(event.date).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
+📍 *Location:* ${event.location || 'TBA'}
+
+Please confirm your availability. Reply YES to accept or NO to decline.
+
+Thank you!
+Fresh People Team`;
+
+        const formattedPhone = staff.phone.replace(/[\s\+\-]/g, '');
+
+        fetch(`https://graph.facebook.com/v22.0/${phoneId}/messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            to: formattedPhone,
+            type: 'text',
+            text: { body: message }
+          })
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.error) {
+            results.push({ staffId: staff.id, staffName: staff.fullName, status: 'failed', error: data.error.message });
+          } else {
+            results.push({ staffId: staff.id, staffName: staff.fullName, status: 'sent', messageId: data.messages?.[0]?.id });
+          }
+          completed++;
+        })
+        .catch(err => {
+          results.push({ staffId: staff.id, staffName: staff.fullName, status: 'failed', error: err.message });
+          completed++;
+        });
+      });
+
+      // Wait for all messages to send (simple polling)
+      const checkComplete = setInterval(() => {
+        if (completed === staffList.length) {
+          clearInterval(checkComplete);
+          res.json({
+            success: true,
+            event: { id: event.id, title: event.title },
+            dispatched: results.filter(r => r.status === 'sent').length,
+            skipped: results.filter(r => r.status === 'skipped').length,
+            failed: results.filter(r => r.status === 'failed').length,
+            results
+          });
+        }
+      }, 100);
+    });
+  });
+});
+
 app.listen(port, () => {
   console.log(`Backend server running on http://localhost:${port}`);
   console.log(`WhatsApp webhook: http://localhost:${port}/webhook`);
