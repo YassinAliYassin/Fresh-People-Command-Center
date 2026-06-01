@@ -88,6 +88,14 @@ const Dashboard: React.FC = () => {
   // ==================== SESSION & TIMING ====================
   const [sessionTimeLeft, setSessionTimeLeft] = useState('4h 00m 00s');
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Live clock update every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
   
   // ==================== DATA STATES ====================
   const [clients, setClients] = useState<Client[]>([]);
