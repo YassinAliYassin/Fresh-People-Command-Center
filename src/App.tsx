@@ -36,6 +36,7 @@ import Payroll from './pages/Payroll';
 // Styles
 import './styles/operations-command.css';
 import './styles/finance-agent.css';
+import './styles/crm-agent.css';
 
 // ==========================================
 // SAMPLE DATA FOR DEMONSTRATION
