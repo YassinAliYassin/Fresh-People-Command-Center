@@ -1,78 +1,180 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 /**
  * Enhanced Operations Sidebar
- * Luxury navigation with glassmorphism and live indicators
+ * Luxury navigation with glassmorphism, accessibility, and smooth transitions
+ * Supports agent identity preservation and consistent navigation patterns
  */
 
-interface NavItem {
+export interface NavItem {
   icon: string;
   label: string;
   path: string;
   badge?: number;
-  badgeVariant?: 'default' | 'alert' | 'success';
+  badgeVariant?: 'default' | 'alert' | 'success' | 'info';
   subItems?: NavItem[];
+  disabled?: boolean;
+  ariaLabel?: string;
 }
 
-interface NavSection {
+export interface NavSection {
   title: string;
   items: NavItem[];
+  icon?: string;
+  collapsible?: boolean;
 }
 
-const navigationSections: NavSection[] = [
-  {
-    title: 'OPERATIONS',
-    items: [
-      { icon: '📊', label: 'Dashboard', path: '/' },
-      { icon: '📅', label: 'Calendar', path: '/calendar' },
-      { icon: '📋', label: 'Events', path: '/events', badge: 5 },
-      { icon: '🔗', label: 'Unified View', path: '/unified-calendar' }
-    ]
-  },
-  {
-    title: 'MANAGEMENT',
-    items: [
-      { icon: '👥', label: 'Staff', path: '/staff' },
-      { icon: '👤', label: 'Clients', path: '/clients' },
-      { icon: '💰', label: 'Payroll', path: '/payroll', badge: 3, badgeVariant: 'alert' }
-    ]
-  },
-  {
-    title: 'INTELLIGENCE',
-    items: [
-      { icon: '📈', label: 'Analytics', path: '/analytics' },
-      { icon: '📊', label: 'Reports', path: '/reports' },
-      { icon: '🔔', label: 'Alerts', path: '/alerts', badge: 2, badgeVariant: 'alert' }
-    ]
-  },
-  {
-    title: 'SYSTEM',
-    items: [
-      { icon: '⚙️', label: 'Settings', path: '/settings' },
-      { icon: '🔌', label: 'Integrations', path: '/integrations' },
-      { icon: '📝', label: 'Activity Log', path: '/activity' }
-    ]
-  }
-];
+export interface AgentTheme {
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  glowColor: string;
+  gradientStart: string;
+  gradientEnd: string;
+  agentName: string;
+  agentIcon: string;
+}
 
 interface OperationsSidebarProps {
   isOpen: boolean;
   onClose: () => void;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  agentTheme?: AgentTheme;
+  onNavigate?: (path: string) => void;
 }
+
+// Default navigation sections - can be customized per agent
+const defaultNavigationSections: NavSection[] = [
+  {
+    title: 'OPERATIONS',
+    icon: '⚡',
+    collapsible: false,
+    items: [
+      { icon: '📊', label: 'Dashboard', path: '/', ariaLabel: 'Navigate to Dashboard' },
+      { icon: '📅', label: 'Calendar', path: '/calendar', ariaLabel: 'Navigate to Calendar' },
+      { icon: '📋', label: 'Events', path: '/events', badge: 5, ariaLabel: 'Navigate to Events' },
+      { icon: '🔗', label: 'Unified View', path: '/unified-calendar', ariaLabel: 'Navigate to Unified Calendar View' }
+    ]
+  },
+  {
+    title: 'MANAGEMENT',
+    icon: '👥',
+    items: [
+      { icon: '👥', label: 'Staff', path: '/staff', ariaLabel: 'Navigate to Staff Management' },
+      { icon: '👤', label: 'Clients', path: '/clients', ariaLabel: 'Navigate to Client Management' },
+      { icon: '💰', label: 'Payroll', path: '/payroll', badge: 3, badgeVariant: 'alert', ariaLabel: 'Navigate to Payroll' }
+    ]
+  },
+  {
+    title: 'INTELLIGENCE',
+    icon: '📈',
+    items: [
+      { icon: '📈', label: 'Analytics', path: '/analytics', ariaLabel: 'Navigate to Analytics' },
+      { icon: '📊', label: 'Reports', path: '/reports', ariaLabel: 'Navigate to Reports' },
+      { icon: '🔔', label: 'Alerts', path: '/alerts', badge: 2, badgeVariant: 'alert', ariaLabel: 'Navigate to Alerts' }
+    ]
+  },
+  {
+    title: 'SYSTEM',
+    icon: '⚙️',
+    items: [
+      { icon: '⚙️', label: 'Settings', path: '/settings', ariaLabel: 'Navigate to Settings' },
+      { icon: '🔌', label: 'Integrations', path: '/integrations', ariaLabel: 'Navigate to Integrations' },
+      { icon: '📝', label: 'Activity Log', path: '/activity', ariaLabel: 'Navigate to Activity Log' }
+    ]
+  }
+];
+
+// Default agent theme (Operations)
+const defaultAgentTheme: AgentTheme = {
+  primaryColor: '#BF8F3B',
+  secondaryColor: '#FBBF24',
+  accentColor: '#F59E0B',
+  glowColor: 'rgba(191, 143, 59, 0.4)',
+  gradientStart: '#BF8F3B',
+  gradientEnd: '#FBBF24',
+  agentName: 'Operations Command',
+  agentIcon: '🎯'
+};
 
 const OperationsSidebar: React.FC<OperationsSidebarProps> = ({
   isOpen,
   onClose,
   collapsed = false,
-  onToggleCollapse
+  onToggleCollapse,
+  agentTheme = defaultAgentTheme,
+  onNavigate
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const sidebarRef = useRef<HTMLElement>(null);
   const [expandedSections, setExpandedSections] = useState<string[]>(['OPERATIONS']);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const [focusedIndex, setFocusedIndex] = useState<number>(-1);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Check if mobile on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Close sidebar on mobile when route changes
+  useEffect(() => {
+    if (isMobile && isOpen) {
+      onClose();
+    }
+  }, [location.pathname, isMobile, isOpen, onClose]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isOpen && e.key !== 'Escape') return;
+
+      switch (e.key) {
+        case 'Escape':
+          if (isOpen) {
+            onClose();
+          }
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          setFocusedIndex(prev => Math.min(prev + 1, getAllNavItems().length - 1));
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setFocusedIndex(prev => Math.max(prev - 1, 0));
+          break;
+        case 'Enter':
+          if (focusedIndex >= 0) {
+            const items = getAllNavItems();
+            if (items[focusedIndex]) {
+              handleNavigation(items[focusedIndex].path);
+            }
+          }
+          break;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, focusedIndex, isOpen, onClose]);
+
+  // Get all navigable items for keyboard navigation
+  const getAllNavItems = useCallback(() => {
+    const items: NavItem[] = [];
+    defaultNavigationSections.forEach(section => {
+      items.push(...section.items);
+    });
+    return items;
+  }, []);
 
   const toggleSection = (title: string) => {
     setExpandedSections(prev =>
@@ -83,8 +185,13 @@ const OperationsSidebar: React.FC<OperationsSidebarProps> = ({
   };
 
   const handleNavigation = (path: string) => {
-    navigate(path);
-    if (window.innerWidth < 768) {
+    if (onNavigate) {
+      onNavigate(path);
+    } else {
+      navigate(path);
+    }
+    
+    if (isMobile) {
       onClose();
     }
   };
@@ -93,105 +200,171 @@ const OperationsSidebar: React.FC<OperationsSidebarProps> = ({
     return location.pathname === path;
   };
 
+  const isSectionActive = (section: NavSection) => {
+    return section.items.some(item => isActive(item.path));
+  };
+
+  // Focus management for keyboard navigation
+  useEffect(() => {
+    if (focusedIndex >= 0 && sidebarRef.current) {
+      const focusableElements = sidebarRef.current.querySelectorAll('[tabindex="0"]');
+      if (focusableElements[focusedIndex]) {
+        (focusableElements[focusedIndex] as HTMLElement).focus();
+      }
+    }
+  }, [focusedIndex]);
+
   return (
     <>
-      {/* Mobile Overlay */}
+      {/* Mobile Overlay with backdrop blur */}
       {isOpen && (
         <div
           className="sidebar-overlay"
           onClick={onClose}
+          role="presentation"
+          aria-hidden="true"
         />
       )}
 
       {/* Sidebar */}
-      <aside className={`operations-sidebar ${isOpen ? 'open' : 'closed'} ${collapsed ? 'collapsed' : ''}`}>
-        {/* Sidebar Header */}
+      <aside
+        ref={sidebarRef}
+        className={`operations-sidebar ${isOpen ? 'open' : 'closed'} ${collapsed ? 'collapsed' : ''}`}
+        aria-label={`${agentTheme.agentName} Navigation`}
+        aria-hidden={!isOpen}
+        role="navigation"
+      >
+        {/* Sidebar Header with Agent Identity */}
         <div className="sidebar-header">
-          <div className="sidebar-logo">
-            <div className="sidebar-logo-icon">F</div>
+          <div className="sidebar-logo" style={{
+            background: `linear-gradient(135deg, ${agentTheme.gradientStart}, ${agentTheme.gradientEnd})`
+          }}>
+            <div className="sidebar-logo-icon">
+              {agentTheme.agentIcon}
+            </div>
             {!collapsed && (
               <div className="sidebar-logo-text">
                 <span className="logo-main">FPCC</span>
-                <span className="logo-sub">Command</span>
+                <span className="logo-sub">{agentTheme.agentName}</span>
               </div>
             )}
           </div>
           
           {!collapsed && onToggleCollapse && (
-            <button className="sidebar-collapse-btn" onClick={onToggleCollapse}>
+            <button
+              className="sidebar-collapse-btn"
+              onClick={onToggleCollapse}
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
               ‹
             </button>
           )}
         </div>
 
         {/* Navigation Sections */}
-        <nav className="sidebar-nav">
-          {navigationSections.map((section) => (
+        <nav className="sidebar-nav" aria-label="Main navigation">
+          {defaultNavigationSections.map((section, sectionIndex) => (
             <div key={section.title} className="sidebar-section">
-              {!collapsed && (
+              {(!collapsed || isMobile) && (
                 <button
-                  className="sidebar-section-title"
+                  className={`sidebar-section-title ${isSectionActive(section) ? 'active' : ''}`}
                   onClick={() => toggleSection(section.title)}
+                  aria-expanded={expandedSections.includes(section.title)}
+                  aria-controls={`section-${section.title.replace(/\s+/g, '-').toLowerCase()}`}
                 >
-                  <span>{section.title}</span>
+                  <span className="section-icon">{section.icon}</span>
+                  <span className="section-title">{section.title}</span>
                   <span className={`section-chevron ${expandedSections.includes(section.title) ? 'expanded' : ''}`}>
                     ›
                   </span>
                 </button>
               )}
               
-              <div className={`sidebar-section-items ${expandedSections.includes(section.title) || collapsed ? 'expanded' : ''}`}>
-                {section.items.map((item) => (
-                  <div
-                    key={item.path}
-                    className={`sidebar-item ${isActive(item.path) ? 'active' : ''} ${hoveredItem === item.path ? 'hovered' : ''}`}
-                    onClick={() => handleNavigation(item.path)}
-                    onMouseEnter={() => setHoveredItem(item.path)}
-                    onMouseLeave={() => setHoveredItem(null)}
-                    title={collapsed ? item.label : undefined}
-                  >
-                    <span className="sidebar-item-icon">{item.icon}</span>
-                    
-                    {!collapsed && (
-                      <>
-                        <span className="sidebar-item-label">{item.label}</span>
-                        
-                        {item.badge && (
-                          <span className={`sidebar-item-badge badge-${item.badgeVariant || 'default'}`}>
-                            {item.badge}
-                          </span>
-                        )}
-                      </>
-                    )}
-                    
-                    {/* Active Indicator */}
-                    {isActive(item.path) && (
-                      <div className="active-indicator" />
-                    )}
-                    
-                    {/* Hover Glow Effect */}
-                    {hoveredItem === item.path && (
-                      <div className="hover-glow" />
-                    )}
-                  </div>
-                ))}
+              <div
+                id={`section-${section.title.replace(/\s+/g, '-').toLowerCase()}`}
+                className={`sidebar-section-items ${expandedSections.includes(section.title) || collapsed ? 'expanded' : ''}`}
+                role="region"
+                aria-label={`${section.title} navigation items`}
+              >
+                {section.items.map((item, itemIndex) => {
+                  const globalIndex = getAllNavItems().findIndex(navItem => navItem.path === item.path);
+                  const active = isActive(item.path);
+                  
+                  return (
+                    <div
+                      key={item.path}
+                      className={`sidebar-item ${active ? 'active' : ''} ${hoveredItem === item.path ? 'hovered' : ''} ${item.disabled ? 'disabled' : ''}`}
+                      onClick={() => !item.disabled && handleNavigation(item.path)}
+                      onMouseEnter={() => setHoveredItem(item.path)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      onFocus={() => setFocusedIndex(globalIndex)}
+                      tabIndex={0}
+                      role="link"
+                      aria-label={item.ariaLabel || `Navigate to ${item.label}`}
+                      aria-current={active ? 'page' : undefined}
+                      title={collapsed ? item.label : undefined}
+                      style={{
+                        '--item-primary': agentTheme.primaryColor,
+                        '--item-glow': agentTheme.glowColor
+                      } as React.CSSProperties}
+                    >
+                      <span className="sidebar-item-icon">{item.icon}</span>
+                      
+                      {!collapsed && (
+                        <>
+                          <span className="sidebar-item-label">{item.label}</span>
+                          
+                          {item.badge && (
+                            <span
+                              className={`sidebar-item-badge badge-${item.badgeVariant || 'default'}`}
+                              aria-label={`${item.badge} notifications`}
+                            >
+                              {item.badge}
+                            </span>
+                          )}
+                        </>
+                      )}
+                      
+                      {/* Active Indicator with animation */}
+                      {active && (
+                        <div className="active-indicator" aria-hidden="true">
+                          <div className="active-indicator-glow" style={{
+                            background: agentTheme.glowColor
+                          }} />
+                        </div>
+                      )}
+                      
+                      {/* Hover Glow Effect */}
+                      {hoveredItem === item.path && !active && (
+                        <div className="hover-glow" aria-hidden="true" style={{
+                          background: `radial-gradient(circle, ${agentTheme.glowColor} 0%, transparent 70%)`
+                        }} />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))}
         </nav>
 
-        {/* Sidebar Footer */}
+        {/* Sidebar Footer with System Status & User Info */}
         <div className="sidebar-footer">
-          {/* System Status */}
-          <div className="system-status-mini">
-            <span className="status-dot-mini operational" />
+          {/* System Status Indicator */}
+          <div className="system-status-mini" role="status" aria-label="System status">
+            <span className="status-dot-mini operational" aria-hidden="true" />
             {!collapsed && <span className="status-text-mini">System Operational</span>}
           </div>
           
           {/* User Info */}
           {!collapsed && (
-            <div className="sidebar-user">
-              <div className="user-avatar">A</div>
+            <div className="sidebar-user" role="button" tabIndex={0} aria-label="User profile">
+              <div className="user-avatar" style={{
+                background: `linear-gradient(135deg, ${agentTheme.gradientStart}, ${agentTheme.gradientEnd})`
+              }}>
+                A
+              </div>
               <div className="user-info">
                 <span className="user-name">Admin</span>
                 <span className="user-role">Commander</span>
