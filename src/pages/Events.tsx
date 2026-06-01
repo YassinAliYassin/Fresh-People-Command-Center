@@ -322,7 +322,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, onDelete }) => {
 
   return (
     <div 
-      className="bg-gray-800 rounded-xl p-6 border transition-all duration-300 hover:transform hover:scale-[1.02] hover:shadow-2xl"
+      className={`bg-gray-800 rounded-xl p-6 border transition-all duration-300 hover:transform hover:scale-[1.02] hover:shadow-2xl ${event.status === 'PENDING' ? 'animate-pulse' : ''}`}
       style={{
         borderColor: priorityColors.border,
         backgroundColor: 'rgba(31, 41, 55, 0.8)',
