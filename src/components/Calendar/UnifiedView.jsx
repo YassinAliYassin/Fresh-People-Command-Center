@@ -7,12 +7,21 @@
 import React, { useState, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
 
+// Get current date string in YYYY-MM-DD format
+const getTodayStr = () => {
+  const t = new Date();
+  const y = t.getFullYear();
+  const m = String(t.getMonth() + 1).padStart(2, '0');
+  const d = String(t.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 const UnifiedCalendarView = ({ 
   googleEvents = [], 
   appleEvents = [], 
-  currentYear = 2026, 
-  currentMonth = 4, 
-  selectedDateStr = '2026-05-28' 
+  currentYear = new Date().getFullYear(), 
+  currentMonth = new Date().getMonth(), 
+  selectedDateStr = getTodayStr()
 }) => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);

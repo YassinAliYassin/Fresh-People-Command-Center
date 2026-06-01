@@ -95,10 +95,16 @@ const Dashboard: React.FC = () => {
   const [roleViewTab, setRoleViewTab] = useState<'individual' | 'specialist'>('specialist');
   const [balanceFilter, setBalanceFilter] = useState<'all' | 'payroll'>('all');
 
-  // Operational Calendar display Month/Year
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [currentMonth, setCurrentMonth] = useState(4); // May (0-indexed: May=4)
-  const [selectedDateStr, setSelectedDateStr] = useState<string>('2026-05-28');
+  // Operational Calendar display Month/Year - use CURRENT date instead of hardcoded
+  const today = new Date();
+  const [currentYear, setCurrentYear] = useState(today.getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(today.getMonth()); // 0-indexed: Jan=0
+  const [selectedDateStr, setSelectedDateStr] = useState<string>(() => {
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  });
 
   // Google Calendar Integration states
   const [googleUser, setGoogleUser] = useState<any | null>(null);
