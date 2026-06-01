@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   OperationalEvent,
   Priority,
@@ -9,9 +9,9 @@ import {
 } from '../../types/event-system';
 
 /**
- * Operations Calendar Component
- * Complete rewrite with day cells as functional containers holding event chips
- * Features: drag-drop, priority colors, status indicators, luxury UI
+ * Operations Calendar Component - Scheduling Agent
+ * Autonomous scheduling agent with improved UX/UI
+ * Features: agent identity, better event chips, hover details, optimized density
  */
 
 interface OperationsCalendarProps {
@@ -19,10 +19,14 @@ interface OperationsCalendarProps {
   onEventClick: (event: OperationalEvent) => void;
   onEventCreate: (date: Date, time?: string) => void;
   onEventDrop: (eventId: string, newDate: Date) => void;
+  onEventUpdate?: (event: OperationalEvent) => void;
+  onEventDelete?: (eventId: string) => void;
   onDateRangeChange?: (start: Date, end: Date) => void;
+  onSyncRequest?: () => void;
   currentDate?: Date;
   view?: 'month' | 'week' | 'day';
   onViewChange?: (view: 'month' | 'week' | 'day') => void;
+  isSyncing?: boolean;
 }
 
 const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
@@ -30,15 +34,26 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
   onEventClick,
   onEventCreate,
   onEventDrop,
+  onEventUpdate,
+  onEventDelete,
   onDateRangeChange,
+  onSyncRequest,
   currentDate = new Date(),
   view = 'month',
-  onViewChange
+  onViewChange,
+  isSyncing = false
 }) => {
+  // ==========================================
+  // STATE MANAGEMENT (Autonomous Behavior)
+  // ==========================================
   const [selectedDate, setSelectedDate] = useState<Date>(currentDate);
   const [draggedEvent, setDraggedEvent] = useState<OperationalEvent | null>(null);
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
+  const [hoveredEvent, setHoveredEvent] = useState<string | null>(null);
   const [calendarDays, setCalendarDays] = useState<Date[]>([]);
+  const [showEventTooltip, setShowEventTooltip] = useState<{ event: OperationalEvent; x: number; y: number } | null>(null);
+  const [isCompactMode, setIsCompactMode] = useState(false);
+  const calendarRef = useRef<HTMLDivElement>(null);
 
   // Generate calendar days for month view
   useEffect(() => {
@@ -82,13 +97,26 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
     return events.filter(event => {
       const eventStart = new Date(event.startDate);
       const eventEnd = new Date(event.endDate);
-      const dayStart = new Date(date.setHours(0, 0, 0, 0));
-      const dayEnd = new Date(date.setHours(23, 59, 59, 999));
+      const dayStart = new Date(date);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(date);
+      dayEnd.setHours(23, 59, 59, 999);
       
       return (eventStart >= dayStart && eventStart <= dayEnd) ||
              (eventEnd >= dayStart && eventEnd <= dayEnd) ||
              (eventStart <= dayStart && eventEnd >= dayEnd);
     }).sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+  }, [events]);
+
+  // Get event statistics
+  const eventStats = useMemo(() => {
+    const total = events.length;
+    const vip = events.filter(e => e.priority === 'VIP').length;
+    const high = events.filter(e => e.priority === 'HIGH').length;
+    const confirmed = events.filter(e => e.status === 'CONFIRMED').length;
+    const upcoming = events.filter(e => new Date(e.startDate) > new Date()).length;
+    
+    return { total, vip, high, confirmed, upcoming };
   }, [events]);
 
   // Drag and drop handlers
@@ -119,7 +147,25 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
     setHoveredCell(null);
   };
 
-  // Render month view
+  // Event hover handlers for tooltip
+  const handleEventHover = (event: OperationalEvent, e: React.MouseEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setShowEventTooltip({
+      event,
+      x: rect.left,
+      y: rect.bottom + 8
+    });
+    setHoveredEvent(event.id);
+  };
+
+  const handleEventHoverEnd = () => {
+    setShowEventTooltip(null);
+    setHoveredEvent(null);
+  };
+
+  // ==========================================
+  // RENDER: MONTH VIEW
+  // ==========================================
   const renderMonthView = () => {
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const today = new Date();
@@ -142,11 +188,12 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
             const isToday = day.toDateString() === today.toDateString();
             const isCurrentMonth = day.getMonth() === selectedDate.getMonth();
             const dayKey = day.toISOString();
+            const isHovered = hoveredCell === dayKey;
 
             return (
               <div
                 key={index}
-                className={`calendar-day ${!isCurrentMonth ? 'other-month' : ''} ${isToday ? 'today' : ''} ${hoveredCell === dayKey ? 'hovered' : ''}`}
+                className={`calendar-day ${!isCurrentMonth ? 'other-month' : ''} ${isToday ? 'today' : ''} ${isHovered ? 'hovered' : ''}`}
                 onClick={() => onEventCreate(day)}
                 onDragOver={(e) => handleDragOver(e, day)}
                 onDrop={(e) => handleDrop(e, day)}
@@ -162,7 +209,7 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
 
                 {/* Event Chips Container */}
                 <div className="day-events">
-                  {dayEvents.slice(0, 4).map((event, eventIndex) => (
+                  {dayEvents.slice(0, isCompactMode ? 3 : 4).map((event, eventIndex) => (
                     <EventChip
                       key={event.id}
                       event={event}
@@ -172,19 +219,22 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
                       }}
                       onDragStart={(e) => handleDragStart(e, event)}
                       onDragEnd={handleDragEnd}
-                      compact={dayEvents.length > 2}
+                      onMouseEnter={(e) => handleEventHover(event, e)}
+                      onMouseLeave={handleEventHoverEnd}
+                      compact={dayEvents.length > 2 || isCompactMode}
+                      isHovered={hoveredEvent === event.id}
                     />
                   ))}
                   
-                  {dayEvents.length > 4 && (
+                  {dayEvents.length > (isCompactMode ? 3 : 4) && (
                     <div className="more-events">
-                      +{dayEvents.length - 4} more
+                      +{dayEvents.length - (isCompactMode ? 3 : 4)} more
                     </div>
                   )}
                 </div>
 
                 {/* Drop Indicator */}
-                {hoveredCell === dayKey && draggedEvent && (
+                {isHovered && draggedEvent && (
                   <div className="drop-indicator" />
                 )}
               </div>
@@ -195,7 +245,9 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
     );
   };
 
-  // Render week view
+  // ==========================================
+  // RENDER: WEEK VIEW
+  // ==========================================
   const renderWeekView = () => {
     const weekStart = getWeekStart(selectedDate);
     const weekDays = Array.from({ length: 7 }, (_, i) => {
@@ -213,6 +265,7 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
           <div className="time-column-header" />
           {weekDays.map((day, index) => {
             const isToday = day.toDateString() === new Date().toDateString();
+            const dayEvents = getEventsForDay(day);
             return (
               <div key={index} className={`week-day-header ${isToday ? 'today' : ''}`}>
                 <span className="week-day-name">
@@ -221,6 +274,9 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
                 <span className={`week-day-number ${isToday ? 'today-badge' : ''}`}>
                   {day.getDate()}
                 </span>
+                {dayEvents.length > 0 && (
+                  <span className="week-day-event-count">{dayEvents.length}</span>
+                )}
               </div>
             );
           })}
@@ -263,21 +319,35 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
                   return (
                     <div
                       key={event.id}
-                      className="week-event"
+                      className={`week-event priority-${event.priority.toLowerCase()}`}
                       style={{
                         top: `${startHour * 60 + startMinute}px`,
-                        height: `${duration * 60}px`,
+                        height: `${Math.max(duration * 60, 30)}px`,
                         ...getEventPositionStyle(event.priority)
                       }}
                       onClick={(e) => {
                         e.stopPropagation();
                         onEventClick(event);
                       }}
+                      onMouseEnter={(e) => handleEventHover(event, e)}
+                      onMouseLeave={handleEventHoverEnd}
                       draggable
                       onDragStart={(e) => handleDragStart(e, event)}
                       onDragEnd={handleDragEnd}
                     >
-                      <EventChip event={event} compact />
+                      <EventChip 
+                        event={event} 
+                        compact
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEventClick(event);
+                        }}
+                        onDragStart={(e) => handleDragStart(e, event)}
+                        onDragEnd={handleDragEnd}
+                        isHovered={hoveredEvent === event.id}
+                        onMouseEnter={(e) => handleEventHover(event, e)}
+                        onMouseLeave={handleEventHoverEnd}
+                      />
                     </div>
                   );
                 })}
@@ -289,9 +359,128 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
     );
   };
 
+  // ==========================================
+  // RENDER: DAY VIEW
+  // ==========================================
+  const renderDayView = () => {
+    const dayEvents = getEventsForDay(selectedDate);
+    const hours = Array.from({ length: 24 }, (_, i) => i);
+    const today = new Date();
+
+    return (
+      <div className="calendar-day-view">
+        {/* Day Header */}
+        <div className={`day-view-header ${selectedDate.toDateString() === today.toDateString() ? 'today' : ''}`}>
+          <div className="day-view-date">
+            <span className="day-name">{selectedDate.toLocaleDateString('en-US', { weekday: 'long' })}</span>
+            <span className="day-number-large">{selectedDate.getDate()}</span>
+            <span className="day-month">{selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
+          </div>
+          <div className="day-view-stats">
+            <span className="day-event-count-large">{dayEvents.length} events</span>
+          </div>
+        </div>
+
+        {/* Time Grid */}
+        <div className="day-view-grid">
+          <div className="time-column">
+            {hours.map(hour => (
+              <div key={hour} className="time-slot">
+                <span>{formatHour(hour)}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="day-view-events">
+            {hours.map(hour => (
+              <div
+                key={hour}
+                className="hour-cell"
+                onClick={() => {
+                  const time = `${hour.toString().padStart(2, '0')}:00`;
+                  onEventCreate(selectedDate, time);
+                }}
+              />
+            ))}
+            
+            {dayEvents.map(event => {
+              const startHour = event.startDate.getHours();
+              const startMinute = event.startDate.getMinutes();
+              const duration = (event.endDate.getTime() - event.startDate.getTime()) / (1000 * 60 * 60);
+              
+              return (
+                <div
+                  key={event.id}
+                  className={`day-view-event priority-${event.priority.toLowerCase()}`}
+                  style={{
+                    top: `${startHour * 60 + startMinute}px`,
+                    height: `${Math.max(duration * 60, 30)}px`,
+                    ...getEventPositionStyle(event.priority)
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEventClick(event);
+                  }}
+                  onMouseEnter={(e) => handleEventHover(event, e)}
+                  onMouseLeave={handleEventHoverEnd}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, event)}
+                  onDragEnd={handleDragEnd}
+                >
+                  <EventChip 
+                    event={event} 
+                    isHovered={hoveredEvent === event.id}
+                    onMouseEnter={(e) => handleEventHover(event, e)}
+                    onMouseLeave={handleEventHoverEnd}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ==========================================
+  // MAIN RENDER
+  // ==========================================
   return (
-    <div className="operations-calendar">
-      {/* Calendar Header */}
+    <div className="operations-calendar" ref={calendarRef}>
+      {/* Agent Identity Header */}
+      <div className="calendar-agent-header">
+        <div className="agent-identity">
+          <div className="agent-icon">📅</div>
+          <div className="agent-info">
+            <h1 className="agent-title">Scheduling Agent</h1>
+            <span className="agent-subtitle">Autonomous Operations Calendar</span>
+          </div>
+          {isSyncing && (
+            <div className="sync-indicator">
+              <span className="sync-spinner" />
+              <span>Syncing...</span>
+            </div>
+          )}
+        </div>
+
+        <div className="agent-actions">
+          {onSyncRequest && (
+            <button className="sync-btn" onClick={onSyncRequest} disabled={isSyncing}>
+              <span className="sync-icon">🔄</span>
+              Sync
+            </button>
+          )}
+          <button 
+            className="compact-toggle-btn" 
+            onClick={() => setIsCompactMode(!isCompactMode)}
+            title={isCompactMode ? 'Normal density' : 'Compact density'}
+          >
+            {isCompactMode ? '⊞' : '⊟'}
+          </button>
+        </div>
+      </div>
+
+      {/* Calendar Command Header */}
       <div className="calendar-command-header">
         <div className="calendar-title-section">
           <h2 className="calendar-title">
@@ -303,15 +492,19 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
           <div className="calendar-stats">
             <span className="stat-item">
               <span className="stat-dot" style={{ background: 'var(--gold-500)' }} />
-              {events.filter(e => e.priority === 'VIP').length} VIP
+              {eventStats.vip} VIP
             </span>
             <span className="stat-item">
               <span className="stat-dot" style={{ background: '#EF4444' }} />
-              {events.filter(e => e.priority === 'HIGH').length} High
+              {eventStats.high} High
+            </span>
+            <span className="stat-item">
+              <span className="stat-dot" style={{ background: '#10B981' }} />
+              {eventStats.confirmed} Confirmed
             </span>
             <span className="stat-item">
               <span className="stat-dot" style={{ background: '#3B82F6' }} />
-              {events.filter(e => e.status === 'CONFIRMED').length} Confirmed
+              {eventStats.upcoming} Upcoming
             </span>
           </div>
         </div>
@@ -345,40 +538,61 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
         {view === 'week' && renderWeekView()}
         {view === 'day' && renderDayView()}
       </div>
+
+      {/* Event Tooltip */}
+      {showEventTooltip && (
+        <EventTooltip 
+          event={showEventTooltip.event}
+          position={{ x: showEventTooltip.x, y: showEventTooltip.y }}
+        />
+      )}
     </div>
   );
 };
 
 // ==========================================
-// EVENT CHIP COMPONENT
+// EVENT CHIP COMPONENT (Improved)
 // ==========================================
-
 interface EventChipProps {
   event: OperationalEvent;
-  onClick: (e: React.MouseEvent) => void;
+  onClick?: (e: React.MouseEvent) => void;
   onDragStart?: (e: React.DragEvent) => void;
   onDragEnd?: () => void;
+  onMouseEnter?: (e: React.MouseEvent) => void;
+  onMouseLeave?: () => void;
   compact?: boolean;
+  isHovered?: boolean;
 }
 
-const EventChip: React.FC<EventChipProps> = ({ event, onClick, onDragStart, onDragEnd, compact }) => {
+const EventChip: React.FC<EventChipProps> = ({ 
+  event, 
+  onClick, 
+  onDragStart, 
+  onDragEnd, 
+  onMouseEnter, 
+  onMouseLeave,
+  compact = false, 
+  isHovered = false 
+}) => {
   const priorityColor = getPriorityColor(event.priority);
   const statusBadge = getStatusBadge(event.status);
 
   return (
     <div
-      className={`event-chip ${compact ? 'compact' : ''} priority-${event.priority.toLowerCase()}`}
+      className={`event-chip ${compact ? 'compact' : ''} ${isHovered ? 'hovered' : ''} priority-${event.priority.toLowerCase()}`}
       onClick={onClick}
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       style={{
         borderLeft: `3px solid ${priorityColor.primary}`,
-        background: priorityColor.bg,
-        borderColor: priorityColor.border
+        background: isHovered ? priorityColor.light + '33' : priorityColor.bg,
+        borderColor: isHovered ? priorityColor.primary : priorityColor.border
       }}
     >
-      {/* Priority Indicator */}
+      {/* Priority Indicator Bar */}
       <div className="chip-priority-bar" style={{ background: priorityColor.primary }} />
       
       {/* Chip Content */}
@@ -402,6 +616,12 @@ const EventChip: React.FC<EventChipProps> = ({ event, onClick, onDragStart, onDr
                 📍 {event.venue.name}
               </div>
             )}
+
+            {event.client && (
+              <div className="chip-client">
+                👥 {event.client.name}
+              </div>
+            )}
           </>
         )}
         
@@ -417,13 +637,80 @@ const EventChip: React.FC<EventChipProps> = ({ event, onClick, onDragStart, onDr
         background: statusBadge.bg,
         color: statusBadge.color
       }}>
-        {event.status.charAt(0)}
+        {statusBadge.icon}
       </div>
 
       {/* Priority Glow Effect */}
-      <div className="chip-glow" style={{
-        boxShadow: `0 0 10px ${priorityColor.glow}`
-      }} />
+      {isHovered && (
+        <div className="chip-glow" style={{
+          boxShadow: `0 0 12px ${priorityColor.glow}`
+        }} />
+      )}
+    </div>
+  );
+};
+
+// ==========================================
+// EVENT TOOLTIP COMPONENT
+// ==========================================
+interface EventTooltipProps {
+  event: OperationalEvent;
+  position: { x: number; y: number };
+}
+
+const EventTooltip: React.FC<EventTooltipProps> = ({ event, position }) => {
+  const priorityColor = getPriorityColor(event.priority);
+  const statusBadge = getStatusBadge(event.status);
+
+  return (
+    <div 
+      className="event-tooltip"
+      style={{
+        left: Math.min(position.x, window.innerWidth - 320),
+        top: position.y
+      }}
+    >
+      <div className="tooltip-header" style={{ borderLeftColor: priorityColor.primary }}>
+        <div className="tooltip-title">{event.title}</div>
+        <div className="tooltip-badges">
+          <span className="tooltip-priority" style={{ color: priorityColor.primary }}>
+            {event.priority}
+          </span>
+          <span className="tooltip-status" style={{ background: statusBadge.bg, color: statusBadge.color }}>
+            {event.status}
+          </span>
+        </div>
+      </div>
+      
+      <div className="tooltip-details">
+        <div className="tooltip-time">
+          🕐 {formatTime(event.startDate)} - {formatTime(event.endDate)}
+        </div>
+        
+        {event.venue && (
+          <div className="tooltip-venue">
+            📍 {event.venue.name}
+          </div>
+        )}
+        
+        {event.client && (
+          <div className="tooltip-client">
+            👥 {event.client.name}
+          </div>
+        )}
+        
+        {event.staff.length > 0 && (
+          <div className="tooltip-staff">
+            👤 {event.staff.length} staff assigned
+          </div>
+        )}
+        
+        {event.description && (
+          <div className="tooltip-description">
+            {event.description}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -477,22 +764,14 @@ function getEventPositionStyle(priority: Priority) {
 
 function getStatusBadge(status: EventStatus) {
   const badges = {
-    SCHEDULED: { color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.1)' },
-    CONFIRMED: { color: '#10B981', bg: 'rgba(16, 185, 129, 0.1)' },
-    IN_PROGRESS: { color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.1)' },
-    COMPLETED: { color: '#6B7280', bg: 'rgba(107, 114, 128, 0.1)' },
-    CANCELLED: { color: '#EF4444', bg: 'rgba(239, 68, 68, 0.1)' },
-    PENDING: { color: '#8B5CF6', bg: 'rgba(139, 92, 246, 0.1)' }
+    SCHEDULED: { color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.1)', icon: '📋' },
+    CONFIRMED: { color: '#10B981', bg: 'rgba(16, 185, 129, 0.1)', icon: '✓' },
+    IN_PROGRESS: { color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.1)', icon: '⚡' },
+    COMPLETED: { color: '#6B7280', bg: 'rgba(107, 114, 128, 0.1)', icon: '✓' },
+    CANCELLED: { color: '#EF4444', bg: 'rgba(239, 68, 68, 0.1)', icon: '✗' },
+    PENDING: { color: '#8B5CF6', bg: 'rgba(139, 92, 246, 0.1)', icon: '⏳' }
   };
   return badges[status] || badges.PENDING;
-}
-
-// ==========================================
-// DAY VIEW RENDERER
-// ==========================================
-
-function renderDayView() {
-  return <div className="day-view-placeholder">Day View - Coming Soon</div>;
 }
 
 export default OperationsCalendar;
