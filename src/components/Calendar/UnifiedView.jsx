@@ -3,7 +3,8 @@
  * Renders Google and Apple Calendar events
  * Props: googleEvents, appleEvents, currentYear, currentMonth, selectedDateStr
  * 
- * FIX: Pure functional component - no useEffect/state to block unmounting
+ * FIX: Pure functional component - no useEffect/state blocking unmounting
+ * FIX: Filter to only show current + upcoming events (last 30 days + future)
  */
 
 import React from 'react';
@@ -58,6 +59,20 @@ const UnifiedCalendarView = ({
     }))
   ];
 
+  // FILTER: Only show events from last 30 days + upcoming (hide old 2024/2025 events)
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - 30); // 30 days ago
+  
+  const filteredEvents = combinedEvents.filter(ev => {
+    if (!ev.start) return false;
+    try {
+      const startDate = parseISO(ev.start);
+      return startDate >= cutoffDate;
+    } catch {
+      return false;
+    }
+  });
+
   const formatEventDate = (dateStr) => {
     if (!dateStr) return 'No date';
     try {
@@ -68,14 +83,14 @@ const UnifiedCalendarView = ({
     }
   };
 
-  console.log(`[UnifiedView] Rendering ${combinedEvents.length} total events (${googleEventsArray.length} Google, ${appleEventsArray.length} Apple)`);
+  console.log(`[UnifiedView] Rendering ${filteredEvents.length} events (${googleEventsArray.length} Google, ${appleEventsArray.length} Apple, filtered from ${combinedEvents.length} total)`);
 
   return (
     <div className="p-6">
       {/* Header */}
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-white mb-2">Unified Calendar</h2>
-        <p className="text-gray-400">Apple Calendar (iCloud Feed) - {combinedEvents.length} events</p>
+        <p className="text-gray-400">Apple Calendar (iCloud Feed) - {filteredEvents.length} events (showing last 30 days + upcoming)</p>
       </div>
 
       {/* Status */}
@@ -83,7 +98,7 @@ const UnifiedCalendarView = ({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-semibold text-white">Apple Calendar</h3>
-            <p className="text-sm text-gray-300">{combinedEvents.length} events loaded</p>
+            <p className="text-sm text-gray-300">{filteredEvents.length} events loaded (last 30 days + upcoming)</p>
           </div>
           <div className="w-3 h-3 rounded-full bg-green-500"></div>
         </div>
@@ -91,12 +106,12 @@ const UnifiedCalendarView = ({
 
       {/* Events List */}
       <div className="space-y-3">
-        {combinedEvents.length === 0 ? (
+        {filteredEvents.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <p>No events found</p>
           </div>
         ) : (
-          combinedEvents.slice(0, 50).map((event) => (
+          filteredEvents.slice(0, 50).map((event) => (
             <div 
               key={event.id} 
               className="p-4 border border-gray-700 rounded-lg hover:shadow-md transition-shadow bg-gray-800"
@@ -127,9 +142,9 @@ const UnifiedCalendarView = ({
         )}
       </div>
 
-      {combinedEvents.length > 50 && (
+      {filteredEvents.length > 50 && (
         <p className="text-sm text-gray-400 mt-4 text-center">
-          Showing 50 of {combinedEvents.length} events
+          Showing 50 of {filteredEvents.length} events
         </p>
       )}
     </div>
