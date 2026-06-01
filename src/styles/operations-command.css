@@ -5,15 +5,19 @@
    ========================================== */
 
 /* ==========================================
-   IMPORT SYSTEM FONTS ONLY (NO EXTERNAL DEPS)
+   FONT SYSTEM - SYSTEM FONTS ONLY (NO EXTERNAL DEPS)
    ========================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+/* Removed Google Fonts import - using system fonts only as per requirements */
 @import './animations-enhanced.css';
 
 /* ==========================================
    CSS CUSTOM PROPERTIES - LUXURY PALETTE
    ========================================== */
+
+html {
+  scroll-behavior: smooth;
+}
 
 :root {
   /* Luxury Gold Spectrum - Primary Brand Colors */
