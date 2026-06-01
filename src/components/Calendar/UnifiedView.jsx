@@ -59,15 +59,20 @@ const UnifiedCalendarView = ({
     }))
   ];
 
-  // FILTER: Only show events from last 30 days + upcoming (hide old 2024/2025 events)
-  const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - 30); // 30 days ago
+  // FILTER: Only show NEXT 30 DAYS (upcoming only, no past events)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const thirtyDaysFromNow = new Date();
+  thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+  thirtyDaysFromNow.setHours(23, 59, 59, 999);
   
   const filteredEvents = combinedEvents.filter(ev => {
     if (!ev.start) return false;
     try {
       const startDate = parseISO(ev.start);
-      return startDate >= cutoffDate;
+      // Only show events starting within the next 30 days
+      return startDate >= today && startDate <= thirtyDaysFromNow;
     } catch {
       return false;
     }
@@ -90,7 +95,7 @@ const UnifiedCalendarView = ({
       {/* Header */}
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-white mb-2">Unified Calendar</h2>
-        <p className="text-gray-400">Apple Calendar (iCloud Feed) - {filteredEvents.length} events (showing last 30 days + upcoming)</p>
+        <p className="text-gray-400">Apple Calendar (iCloud Feed) - {filteredEvents.length} events (next 30 days)</p>
       </div>
 
       {/* Status */}
@@ -98,7 +103,7 @@ const UnifiedCalendarView = ({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-semibold text-white">Apple Calendar</h3>
-            <p className="text-sm text-gray-300">{filteredEvents.length} events loaded (last 30 days + upcoming)</p>
+            <p className="text-sm text-gray-300">{filteredEvents.length} events loaded (next 30 days only)</p>
           </div>
           <div className="w-3 h-3 rounded-full bg-green-500"></div>
         </div>
