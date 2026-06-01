@@ -3657,6 +3657,17 @@ kbd {
   .header-right {
     gap: 0.5rem;
   }
+
+  /* Mobile Touch Target Optimization - Apple recommended 44px min */
+  button, 
+  [role="button"], 
+  a {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
 
 /* Mobile Small - 480px and below */
