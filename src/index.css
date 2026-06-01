@@ -1,37 +1,64 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
-@import "tailwindcss";
+/* ==========================================
+   FPCC LUXURY COMMAND CENTER THEME
+   No External Dependencies
+========================================== */
 
-@theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Space Grotesk", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+:root {
 
-  /* Luxury Gold Palette */
-  --color-gold-50: #FCF9F2;
-  --color-gold-100: #F7F0E1;
-  --color-gold-200: #ECDDB9;
-  --color-gold-300: #DEC68A;
-  --color-gold-400: #CEAB5B;
-  --color-gold-500: #BF8F3B;
-  --color-gold-600: #A4742E;
-  --color-gold-700: #815923;
-  --color-gold-800: #60411C;
-  --color-gold-900: #432C15;
-  --color-gold-950: #2A1A0C;
+  /* Fonts */
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, Ubuntu, sans-serif;
 
-  /* Base Colors */
-  --color-bg-primary: #FAF9F6;
-  --color-bg-secondary: #F5F3EB;
-  --color-text-primary: #1E293B;
+  --font-display: system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+
+  --font-mono: Consolas, Monaco, Menlo,
+    "Courier New", monospace;
+
+  /* Gold Palette */
+  --gold-50: #FCF9F2;
+  --gold-100: #F7F0E1;
+  --gold-200: #ECDDB9;
+  --gold-300: #DEC68A;
+  --gold-400: #CEAB5B;
+  --gold-500: #BF8F3B;
+  --gold-600: #A4742E;
+  --gold-700: #815923;
+  --gold-800: #60411C;
+  --gold-900: #432C15;
+  --gold-950: #2A1A0C;
+
+  /* Neutral Palette */
+  --background: #FAF9F6;
+  --background-soft: #F5F3EB;
+  --surface: rgba(255,255,255,0.88);
+
+  --text-primary: #1E293B;
+  --text-secondary: #64748B;
 
   /* Shadows */
-  --shadow-gold: 0 4px 18px rgba(164, 116, 46, 0.08);
-  --shadow-luxury: 0 10px 40px rgba(164, 116, 46, 0.04);
+  --shadow-gold:
+    0 4px 18px rgba(164,116,46,0.08);
+
+  --shadow-luxury:
+    0 10px 40px rgba(164,116,46,0.04);
+
+  --shadow-card:
+    0 8px 30px rgba(15,23,42,0.05);
+
+  /* Radius */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+
+  /* Animation Speed */
+  --transition-fast: 0.2s;
+  --transition-normal: 0.35s;
 }
 
-/* =====================================================
-   Global Styling
-===================================================== */
+/* ==========================================
+   GLOBAL
+========================================== */
 
 html {
   scroll-behavior: smooth;
@@ -40,30 +67,41 @@ html {
 body {
   margin: 0;
   font-family: var(--font-sans);
-  color: var(--color-text-primary);
-  background-color: var(--color-bg-primary);
+  color: var(--text-primary);
 
   background:
     radial-gradient(
-      circle at 100% 0%,
-      #ffffff 15%,
+      circle at top right,
+      #ffffff 10%,
       #faf9f6 50%,
       #f5f3eb 100%
     );
 
+  min-height: 100vh;
   overflow-x: hidden;
 }
 
-/* =====================================================
-   Ambient Background Effects
-===================================================== */
+/* ==========================================
+   TYPOGRAPHY
+========================================== */
+
+.display-font {
+  font-family: var(--font-display);
+}
+
+.mono-font {
+  font-family: var(--font-mono);
+}
+
+/* ==========================================
+   AMBIENT BACKGROUND GLOWS
+========================================== */
 
 .ambient-glow-1,
 .ambient-glow-2 {
-  position: absolute;
+  position: fixed;
   pointer-events: none;
-  z-index: 1;
-  mix-blend-mode: multiply;
+  z-index: -1;
 }
 
 .ambient-glow-1 {
@@ -75,8 +113,8 @@ body {
   background:
     radial-gradient(
       circle,
-      rgba(164,116,46,0.04) 0%,
-      rgba(250,249,246,0) 70%
+      rgba(164,116,46,0.05) 0%,
+      transparent 70%
     );
 
   animation: slowPulse 14s infinite alternate;
@@ -91,14 +129,15 @@ body {
   background:
     radial-gradient(
       circle,
-      rgba(191,143,59,0.03) 0%,
-      rgba(250,249,246,0) 75%
+      rgba(191,143,59,0.04) 0%,
+      transparent 75%
     );
 
   animation: slowPulse 18s infinite alternate-reverse;
 }
 
 @keyframes slowPulse {
+
   0% {
     transform: translate(0,0) scale(1);
     filter: blur(40px);
@@ -115,31 +154,9 @@ body {
   }
 }
 
-/* =====================================================
-   Scrollbar Styling
-===================================================== */
-
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgba(0,0,0,0.02);
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,0.08);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(164,116,46,0.35);
-}
-
-/* =====================================================
-   Glass Panels
-===================================================== */
+/* ==========================================
+   GLASS PANELS
+========================================== */
 
 .glass-panel {
   background: rgba(255,255,255,0.88);
@@ -149,107 +166,218 @@ body {
 
   border: 1px solid rgba(164,116,46,0.16);
 
+  border-radius: var(--radius-lg);
+
   box-shadow:
     0 4px 20px rgba(164,116,46,0.02),
     inset 0 1px 0 rgba(255,255,255,0.9);
-
-  border-radius: 20px;
 }
 
-.shadow-gold-glow {
-  box-shadow: var(--shadow-gold);
-}
+/* ==========================================
+   COMMAND CENTER CARDS
+========================================== */
 
-.shadow-luxury-glow {
-  box-shadow: var(--shadow-luxury);
-}
+.command-card {
+  background: white;
 
-/* =====================================================
-   Payroll Calendar Highlight
-===================================================== */
+  border-radius: var(--radius-md);
 
-.payroll-span {
-  background-color: rgba(191,143,59,0.06) !important;
-  border: 1px dashed rgba(191,143,59,0.35) !important;
-}
+  border: 1px solid rgba(164,116,46,0.10);
 
-/* =====================================================
-   Luxury Cards
-===================================================== */
-
-.luxury-card {
-  background: rgba(255,255,255,0.9);
-  border: 1px solid rgba(164,116,46,0.12);
-  border-radius: 20px;
   padding: 20px;
 
+  box-shadow: var(--shadow-card);
+
   transition:
-    transform 0.3s ease,
-    box-shadow 0.3s ease;
+    transform var(--transition-normal),
+    box-shadow var(--transition-normal);
 }
 
-.luxury-card:hover {
-  transform: translateY(-2px);
+.command-card:hover {
+  transform: translateY(-3px);
 
   box-shadow:
-    0 12px 32px rgba(164,116,46,0.08);
+    0 12px 35px rgba(164,116,46,0.08);
 }
 
-/* =====================================================
-   Buttons
-===================================================== */
+/* ==========================================
+   KPI CARDS
+========================================== */
 
-.btn-gold {
-  background: var(--color-gold-500);
+.kpi-card {
+  background: linear-gradient(
+    135deg,
+    #ffffff,
+    #faf9f6
+  );
+
+  border-left: 4px solid var(--gold-500);
+
+  border-radius: var(--radius-md);
+
+  padding: 18px;
+
+  box-shadow: var(--shadow-card);
+}
+
+/* ==========================================
+   BUTTONS
+========================================== */
+
+.btn-primary {
+  background: var(--gold-500);
   color: white;
+
   border: none;
-  border-radius: 12px;
 
   padding: 12px 20px;
+
+  border-radius: var(--radius-sm);
+
+  cursor: pointer;
 
   font-weight: 600;
-  cursor: pointer;
 
-  transition: all 0.25s ease;
+  transition: all .25s ease;
 }
 
-.btn-gold:hover {
-  background: var(--color-gold-600);
-  transform: translateY(-1px);
+.btn-primary:hover {
+  background: var(--gold-600);
+  transform: translateY(-2px);
 }
 
-.btn-outline-gold {
+.btn-secondary {
   background: transparent;
-  color: var(--color-gold-600);
 
-  border: 1px solid var(--color-gold-500);
+  border: 1px solid var(--gold-500);
 
-  border-radius: 12px;
+  color: var(--gold-700);
+
   padding: 12px 20px;
 
+  border-radius: var(--radius-sm);
+
   cursor: pointer;
 }
 
-.btn-outline-gold:hover {
+.btn-secondary:hover {
   background: rgba(191,143,59,0.08);
 }
 
-/* =====================================================
-   Animations
-===================================================== */
+/* ==========================================
+   STATUS BADGES
+========================================== */
 
-.fade-in-up {
-  animation: scaleUpFade 0.4s cubic-bezier(0.16,1,0.3,1) forwards;
+.status-active {
+  color: #16a34a;
+  background: rgba(22,163,74,.08);
 }
 
-@keyframes scaleUpFade {
+.status-pending {
+  color: #d97706;
+  background: rgba(217,119,6,.08);
+}
+
+.status-danger {
+  color: #dc2626;
+  background: rgba(220,38,38,.08);
+}
+
+.status-active,
+.status-pending,
+.status-danger {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ==========================================
+   PAYROLL HIGHLIGHT
+========================================== */
+
+.payroll-span {
+  background:
+    rgba(191,143,59,0.06);
+
+  border:
+    1px dashed rgba(191,143,59,0.35);
+}
+
+/* ==========================================
+   SCROLLBARS
+========================================== */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(164,116,46,0.25);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(164,116,46,0.45);
+}
+
+/* ==========================================
+   ANIMATIONS
+========================================== */
+
+.fade-in-up {
+  animation: fadeInUp .45s ease forwards;
+}
+
+@keyframes fadeInUp {
+
   from {
     opacity: 0;
-    transform: translateY(12px) scale(0.98);
+    transform: translateY(12px);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
+  }
+}
+
+.scale-in {
+  animation: scaleIn .35s ease forwards;
+}
+
+@keyframes scaleIn {
+
+  from {
+    opacity: 0;
+    transform: scale(.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.glow-gold {
+  animation: glowGold 4s infinite ease-in-out;
+}
+
+@keyframes glowGold {
+
+  0%,100% {
+    box-shadow:
+      0 0 0 rgba(191,143,59,0);
+  }
+
+  50% {
+    box-shadow:
+      0 0 25px rgba(191,143,59,0.18);
   }
 }
