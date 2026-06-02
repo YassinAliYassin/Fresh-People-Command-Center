@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Users, 
   UserPlus, 
@@ -150,6 +150,58 @@ const Staff = () => {
     offDuty: staffList.filter(s => s.availability === 'off-duty').length,
     total: staffList.length
   };
+
+  const staffPerformance = useMemo(() => {
+    return staffList.map(staff => {
+      const staffAssignments = getStaffAssignments(staff.id);
+      const completed = staffAssignments.filter(a => a.status?.toLowerCase() === 'completed').length;
+      const upcoming = staffAssignments.filter(a => new Date(a.eventDate) >= new Date()).length;
+      const utilization = staffAssignments.length > 0 ? Math.round((completed / staffAssignments.length) * 100) : 0;
+      const availabilityScore = staff.availability === 'available' ? 35 : staff.availability === 'busy' ? 18 : 6;
+      const roleDemand = staffList.filter(member => member.role === staff.role).length;
+      const assignmentScore = Math.max(0, 35 - staffAssignments.length * 4);
+      const rateScore = staff.hourlyRate ? Math.max(5, 30 - Math.round(staff.hourlyRate / 20)) : 15;
+
+      return {
+        staff,
+        assignments: staffAssignments,
+        completed,
+        upcoming,
+        utilization,
+        optimizerScore: Math.min(100, availabilityScore + assignmentScore + rateScore + Math.min(10, roleDemand * 2))
+      };
+    }).sort((a, b) => b.optimizerScore - a.optimizerScore);
+  }, [staffList, assignments]);
+
+  const optimizedStaff = useMemo(() => {
+    return staffPerformance
+      .filter(item => item.staff.status !== 'inactive' && item.staff.availability !== 'off-duty')
+      .slice(0, 5);
+  }, [staffPerformance]);
+
+  const shiftPlan = useMemo(() => {
+    const upcomingAssignments = assignments
+      .filter(assignment => new Date(assignment.eventDate) >= new Date())
+      .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime())
+      .slice(0, 6);
+
+    return upcomingAssignments.map(assignment => ({
+      ...assignment,
+      staff: staffList.find(staff => staff.id === assignment.staffId)
+    }));
+  }, [assignments, staffList]);
+
+  const performanceMetrics = useMemo(() => {
+    const activeStaff = staffList.filter(staff => staff.status !== 'inactive').length;
+    const assignedStaff = new Set(assignments.map(assignment => assignment.staffId)).size;
+    const utilization = activeStaff > 0 ? Math.round((assignedStaff / activeStaff) * 100) : 0;
+    const averageScore = staffPerformance.length
+      ? Math.round(staffPerformance.reduce((sum, item) => sum + item.optimizerScore, 0) / staffPerformance.length)
+      : 0;
+    const coverageRisk = Math.max(0, shiftPlan.length - availabilityStats.available);
+
+    return { activeStaff, assignedStaff, utilization, averageScore, coverageRisk };
+  }, [staffList, assignments, staffPerformance, shiftPlan.length, availabilityStats.available]);
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -356,6 +408,91 @@ const Staff = () => {
             </div>
           </div>
         )}
+
+        {/* Operations Agent Intelligence */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <div className="relative overflow-hidden bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-2xl border border-gray-700/50 shadow-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Activity size={20} className="text-[#BF8F3B]" />
+                Availability Optimizer
+              </h2>
+              <span className="text-xs text-gray-400">{optimizedStaff.length} matches</span>
+            </div>
+            <div className="space-y-3">
+              {optimizedStaff.map(item => (
+                <div key={item.staff.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-700/60 bg-gray-800/40 px-3 py-2">
+                  <div>
+                    <p className="text-sm font-semibold text-white">{item.staff.staffName}</p>
+                    <span className="text-xs text-gray-400">{item.staff.role || 'General'} • {item.assignments.length} shifts</span>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-[#BF8F3B]">{item.optimizerScore}%</p>
+                    <span className={`text-xs ${item.staff.availability === 'available' ? 'text-green-400' : 'text-yellow-400'}`}>
+                      {item.staff.availability}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {optimizedStaff.length === 0 && (
+                <p className="text-sm text-gray-400">No available staff match current filters.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="relative overflow-hidden bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-2xl border border-gray-700/50 shadow-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Calendar size={20} className="text-[#BF8F3B]" />
+                Shift Planner
+              </h2>
+              <span className={`text-xs ${performanceMetrics.coverageRisk > 0 ? 'text-yellow-400' : 'text-green-400'}`}>
+                {performanceMetrics.coverageRisk > 0 ? `${performanceMetrics.coverageRisk} coverage risk` : 'Covered'}
+              </span>
+            </div>
+            <div className="space-y-3">
+              {shiftPlan.map(shift => (
+                <div key={`${shift.id}-${shift.staffId}`} className="rounded-lg border border-gray-700/60 bg-gray-800/40 px-3 py-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-white">{shift.eventName || 'Scheduled event'}</p>
+                    <span className="text-xs text-gray-400">{new Date(shift.eventDate).toLocaleDateString()}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-400">
+                    {shift.staff?.staffName || 'Unmatched staff'} • {shift.status || 'pending'}
+                  </p>
+                </div>
+              ))}
+              {shiftPlan.length === 0 && (
+                <p className="text-sm text-gray-400">No upcoming shifts found.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="relative overflow-hidden bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-2xl border border-gray-700/50 shadow-xl p-5">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
+              <TrendingUp size={20} className="text-[#BF8F3B]" />
+              Performance Metrics
+            </h2>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg border border-gray-700/60 bg-gray-800/40 p-3">
+                <span className="text-xs text-gray-400">Utilization</span>
+                <p className="text-2xl font-bold text-white">{performanceMetrics.utilization}%</p>
+              </div>
+              <div className="rounded-lg border border-gray-700/60 bg-gray-800/40 p-3">
+                <span className="text-xs text-gray-400">Avg Score</span>
+                <p className="text-2xl font-bold text-[#BF8F3B]">{performanceMetrics.averageScore}%</p>
+              </div>
+              <div className="rounded-lg border border-gray-700/60 bg-gray-800/40 p-3">
+                <span className="text-xs text-gray-400">Assigned</span>
+                <p className="text-2xl font-bold text-white">{performanceMetrics.assignedStaff}</p>
+              </div>
+              <div className="rounded-lg border border-gray-700/60 bg-gray-800/40 p-3">
+                <span className="text-xs text-gray-400">Active</span>
+                <p className="text-2xl font-bold text-white">{performanceMetrics.activeStaff}</p>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Add/Edit Staff Form */}
         <div className="relative overflow-hidden bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-2xl border border-gray-700/50 shadow-2xl">

@@ -53,7 +53,16 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
   const [calendarDays, setCalendarDays] = useState<Date[]>([]);
   const [showEventTooltip, setShowEventTooltip] = useState<{ event: OperationalEvent; x: number; y: number } | null>(null);
   const [isCompactMode, setIsCompactMode] = useState(false);
+  const [calendarSourceFilter, setCalendarSourceFilter] = useState<'all' | 'local' | 'icloud' | 'google'>('all');
+  const [rescheduleConflict, setRescheduleConflict] = useState<{ event: OperationalEvent; conflicts: OperationalEvent[] } | null>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
+
+  const visibleEvents = useMemo(() => {
+    if (calendarSourceFilter === 'all') return events;
+    return events.filter(event => event.source === calendarSourceFilter);
+  }, [events, calendarSourceFilter]);
+
+  const conflictMap = useMemo(() => detectOperationalConflicts(visibleEvents), [visibleEvents]);
 
   // Generate calendar days for month view
   useEffect(() => {
@@ -149,7 +158,7 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
 
   // Get events for a specific day
   const getEventsForDay = useCallback((date: Date) => {
-    return events.filter(event => {
+    return visibleEvents.filter(event => {
       const eventStart = new Date(event.startDate);
       const eventEnd = new Date(event.endDate);
       const dayStart = new Date(date);
@@ -161,18 +170,19 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
              (eventEnd >= dayStart && eventEnd <= dayEnd) ||
              (eventStart <= dayStart && eventEnd >= dayEnd);
     }).sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-  }, [events]);
+  }, [visibleEvents]);
 
   // Get event statistics
   const eventStats = useMemo(() => {
-    const total = events.length;
-    const vip = events.filter(e => e.priority === 'VIP').length;
-    const high = events.filter(e => e.priority === 'HIGH').length;
-    const confirmed = events.filter(e => e.status === 'CONFIRMED').length;
-    const upcoming = events.filter(e => new Date(e.startDate) > new Date()).length;
+    const total = visibleEvents.length;
+    const vip = visibleEvents.filter(e => e.priority === 'VIP').length;
+    const high = visibleEvents.filter(e => e.priority === 'HIGH').length;
+    const confirmed = visibleEvents.filter(e => e.status === 'CONFIRMED').length;
+    const upcoming = visibleEvents.filter(e => new Date(e.startDate) > new Date()).length;
+    const conflicts = conflictMap.size;
     
-    return { total, vip, high, confirmed, upcoming };
-  }, [events]);
+    return { total, vip, high, confirmed, upcoming, conflicts };
+  }, [visibleEvents, conflictMap]);
 
   // Drag and drop handlers
   const handleDragStart = (e: React.DragEvent, event: OperationalEvent) => {
@@ -187,12 +197,27 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
     setHoveredCell(date.toISOString());
   };
 
-  const handleDrop = (e: React.DragEvent, date: Date) => {
+  const handleDrop = (e: React.DragEvent, date: Date, hour?: number) => {
     e.preventDefault();
     setHoveredCell(null);
     
     if (draggedEvent) {
-      onEventDrop(draggedEvent.id, date);
+      const newStart = buildRescheduledDate(draggedEvent, date, hour);
+      const duration = draggedEvent.endDate.getTime() - draggedEvent.startDate.getTime();
+      const updatedEvent = {
+        ...draggedEvent,
+        startDate: newStart,
+        endDate: new Date(newStart.getTime() + duration)
+      };
+      const conflicts = findEventConflicts(updatedEvent, visibleEvents, draggedEvent.id);
+
+      if (conflicts.length > 0) {
+        setRescheduleConflict({ event: updatedEvent, conflicts });
+        setDraggedEvent(null);
+        return;
+      }
+
+      onEventDrop(draggedEvent.id, newStart);
       setDraggedEvent(null);
     }
   };
@@ -279,6 +304,7 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
                       onMouseLeave={handleEventHoverEnd}
                       compact={dayEvents.length > 2 || isCompactMode}
                       isHovered={hoveredEvent === event.id}
+                      hasConflict={conflictMap.has(event.id)}
                     />
                   ))}
                   
@@ -359,6 +385,8 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
                   <div
                     key={hour}
                     className="hour-cell"
+                    onDragOver={(e) => handleDragOver(e, day)}
+                    onDrop={(e) => handleDrop(e, day, hour)}
                     onClick={() => {
                       const time = `${hour.toString().padStart(2, '0')}:00`;
                       onEventCreate(day, time);
@@ -403,6 +431,7 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
                         isHovered={hoveredEvent === event.id}
                         onMouseEnter={(e) => handleEventHover(event, e)}
                         onMouseLeave={handleEventHoverEnd}
+                        hasConflict={conflictMap.has(event.id)}
                       />
                     </div>
                   );
@@ -452,6 +481,8 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
               <div
                 key={hour}
                 className="hour-cell"
+                onDragOver={(e) => handleDragOver(e, selectedDate)}
+                onDrop={(e) => handleDrop(e, selectedDate, hour)}
                 onClick={() => {
                   const time = `${hour.toString().padStart(2, '0')}:00`;
                   onEventCreate(selectedDate, time);
@@ -488,6 +519,7 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
                     isHovered={hoveredEvent === event.id}
                     onMouseEnter={(e) => handleEventHover(event, e)}
                     onMouseLeave={handleEventHoverEnd}
+                    hasConflict={conflictMap.has(event.id)}
                   />
                 </div>
               );
@@ -562,10 +594,28 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
               <span className="stat-dot" style={{ background: '#3B82F6' }} />
               {eventStats.upcoming} Upcoming
             </span>
+            <span className="stat-item">
+              <span className="stat-dot" style={{ background: '#F59E0B' }} />
+              {eventStats.conflicts} Conflicts
+            </span>
           </div>
         </div>
 
         <div className="calendar-controls">
+          {/* Unified Source View */}
+          <div className="view-switcher unified-source-switcher">
+            {(['all', 'local', 'icloud', 'google'] as const).map(source => (
+              <button
+                key={source}
+                className={`view-btn ${calendarSourceFilter === source ? 'active' : ''}`}
+                onClick={() => setCalendarSourceFilter(source)}
+                title={`${source === 'all' ? 'Unified' : source} calendar`}
+              >
+                {source === 'all' ? 'Unified' : source}
+              </button>
+            ))}
+          </div>
+
           {/* View Switcher */}
           <div className="view-switcher">
             {(['month', 'week', 'day'] as const).map(v => (
@@ -600,7 +650,31 @@ const OperationsCalendar: React.FC<OperationsCalendarProps> = ({
         <EventTooltip 
           event={showEventTooltip.event}
           position={{ x: showEventTooltip.x, y: showEventTooltip.y }}
+          conflicts={conflictMap.get(showEventTooltip.event.id)}
         />
+      )}
+
+      {rescheduleConflict && (
+        <div className="calendar-conflict-banner">
+          <div>
+            <strong>Conflict detected</strong>
+            <span>
+              {rescheduleConflict.event.title} overlaps with {rescheduleConflict.conflicts.map(event => event.title).join(', ')}
+            </span>
+          </div>
+          <div className="calendar-conflict-actions">
+            <button
+              className="today-btn"
+              onClick={() => {
+                onEventDrop(rescheduleConflict.event.id, rescheduleConflict.event.startDate);
+                setRescheduleConflict(null);
+              }}
+            >
+              Reschedule anyway
+            </button>
+            <button className="nav-btn" onClick={() => setRescheduleConflict(null)}>×</button>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -618,6 +692,7 @@ interface EventChipProps {
   onMouseLeave?: () => void;
   compact?: boolean;
   isHovered?: boolean;
+  hasConflict?: boolean;
 }
 
 const EventChip: React.FC<EventChipProps> = ({ 
@@ -628,14 +703,15 @@ const EventChip: React.FC<EventChipProps> = ({
   onMouseEnter, 
   onMouseLeave,
   compact = false, 
-  isHovered = false 
+  isHovered = false,
+  hasConflict = false
 }) => {
   const priorityColor = getPriorityColor(event.priority);
   const statusBadge = getStatusBadge(event.status);
 
   return (
     <div
-      className={`event-chip ${compact ? 'compact' : ''} ${isHovered ? 'hovered' : ''} priority-${event.priority.toLowerCase()}`}
+      className={`event-chip ${compact ? 'compact' : ''} ${isHovered ? 'hovered' : ''} ${hasConflict ? 'has-conflict' : ''} priority-${event.priority.toLowerCase()}`}
       onClick={onClick}
       draggable
       onDragStart={onDragStart}
@@ -693,7 +769,7 @@ const EventChip: React.FC<EventChipProps> = ({
         background: statusBadge.bg,
         color: statusBadge.color
       }}>
-        {statusBadge.icon}
+        {hasConflict ? '!' : statusBadge.icon}
       </div>
 
       {/* Priority Glow Effect */}
@@ -712,9 +788,10 @@ const EventChip: React.FC<EventChipProps> = ({
 interface EventTooltipProps {
   event: OperationalEvent;
   position: { x: number; y: number };
+  conflicts?: OperationalEvent[];
 }
 
-const EventTooltip: React.FC<EventTooltipProps> = ({ event, position }) => {
+const EventTooltip: React.FC<EventTooltipProps> = ({ event, position, conflicts = [] }) => {
   const priorityColor = getPriorityColor(event.priority);
   const statusBadge = getStatusBadge(event.status);
 
@@ -758,6 +835,16 @@ const EventTooltip: React.FC<EventTooltipProps> = ({ event, position }) => {
         {event.staff.length > 0 && (
           <div className="tooltip-staff">
             👤 {event.staff.length} staff assigned
+          </div>
+        )}
+
+        <div className="tooltip-source">
+          Source: {event.source}
+        </div>
+
+        {conflicts.length > 0 && (
+          <div className="tooltip-conflict">
+            ⚠ Conflicts with {conflicts.map(conflict => conflict.title).join(', ')}
           </div>
         )}
         
@@ -816,6 +903,41 @@ function getEventPositionStyle(priority: Priority) {
     borderLeft: `3px solid ${colors.primary}`,
     boxShadow: `0 2px 8px ${colors.glow}`
   };
+}
+
+function buildRescheduledDate(event: OperationalEvent, targetDate: Date, hour?: number): Date {
+  const next = new Date(targetDate);
+  next.setHours(
+    hour ?? event.startDate.getHours(),
+    hour !== undefined ? 0 : event.startDate.getMinutes(),
+    0,
+    0
+  );
+  return next;
+}
+
+function findEventConflicts(
+  targetEvent: OperationalEvent,
+  events: OperationalEvent[],
+  excludeEventId?: string
+): OperationalEvent[] {
+  return events.filter(event => {
+    if (event.id === excludeEventId) return false;
+    return targetEvent.startDate < event.endDate && targetEvent.endDate > event.startDate;
+  });
+}
+
+function detectOperationalConflicts(events: OperationalEvent[]): Map<string, OperationalEvent[]> {
+  const conflictMap = new Map<string, OperationalEvent[]>();
+
+  events.forEach(event => {
+    const conflicts = findEventConflicts(event, events, event.id);
+    if (conflicts.length > 0) {
+      conflictMap.set(event.id, conflicts);
+    }
+  });
+
+  return conflictMap;
 }
 
 function getStatusBadge(status: EventStatus) {

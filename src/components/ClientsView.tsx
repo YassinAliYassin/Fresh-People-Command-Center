@@ -23,7 +23,10 @@ import {
   X,
   ChevronRight,
   Award,
-  Activity
+  Activity,
+  Send,
+  MessageSquare,
+  Target
 } from 'lucide-react';
 import { Client as BaseClient } from '../types';
 
@@ -39,6 +42,14 @@ interface ClientEvent {
   revenue: number;
 }
 
+interface ClientCommunication {
+  id: string;
+  type: 'call' | 'email' | 'whatsapp' | 'meeting';
+  subject: string;
+  date: string;
+  outcome: string;
+}
+
 interface CRMClient extends BaseClient {
   address?: string;
   status: 'active' | 'inactive' | 'lead' | 'vip';
@@ -47,6 +58,7 @@ interface CRMClient extends BaseClient {
   eventsBooked?: number;
   totalRevenue?: number;
   eventHistory?: ClientEvent[];
+  communicationHistory?: ClientCommunication[];
   createdAt?: string;
 }
 
@@ -109,6 +121,7 @@ const ClientsView: React.FC<ClientsViewProps> = ({ onSelectClient }) => {
           eventsBooked: client.eventsBooked || 0,
           totalRevenue: client.totalRevenue || 0,
           eventHistory: client.eventHistory || [],
+          communicationHistory: client.communicationHistory || buildCommunicationHistory(client),
           notes: client.notes || '',
           address: client.address || '',
           lastContact: client.lastContact || null
@@ -185,6 +198,23 @@ const ClientsView: React.FC<ClientsViewProps> = ({ onSelectClient }) => {
     const totalEvents = clients.reduce((sum, c) => sum + (c.eventsBooked || 0), 0);
 
     return { total, active, vip, leads, totalRevenue, totalEvents };
+  }, [clients]);
+
+  const pipelineStages = React.useMemo(() => {
+    const stages = [
+      { id: 'lead', label: 'Lead', clients: clients.filter(c => c.status === 'lead') },
+      { id: 'active', label: 'Active', clients: clients.filter(c => c.status === 'active') },
+      { id: 'vip', label: 'VIP', clients: clients.filter(c => c.status === 'vip') },
+      { id: 'inactive', label: 'Dormant', clients: clients.filter(c => c.status === 'inactive') }
+    ];
+
+    return stages.map(stage => ({
+      ...stage,
+      value: stage.clients.reduce((sum, client) => sum + (client.totalRevenue || 0), 0),
+      avgScore: stage.clients.length
+        ? Math.round(stage.clients.reduce((sum, client) => sum + calculateLeadScore(client), 0) / stage.clients.length)
+        : 0
+    }));
   }, [clients]);
 
   // ==========================================
@@ -313,6 +343,12 @@ const ClientsView: React.FC<ClientsViewProps> = ({ onSelectClient }) => {
       day: 'numeric',
       year: 'numeric'
     });
+  };
+
+  const getLeadScoreClass = (score: number) => {
+    if (score >= 80) return 'crm-score-hot';
+    if (score >= 55) return 'crm-score-warm';
+    return 'crm-score-cold';
   };
 
   // ==========================================
@@ -495,6 +531,46 @@ const ClientsView: React.FC<ClientsViewProps> = ({ onSelectClient }) => {
         </div>
       </div>
 
+      {/* Pipeline View */}
+      <div className="crm-agent-panel">
+        <div className="crm-agent-panel-header">
+          <h2 className="crm-agent-panel-title">
+            <Target className="w-5 h-5" />
+            Pipeline View
+          </h2>
+          <span className="crm-agent-panel-meta">{pipelineStages.length} stages monitored</span>
+        </div>
+        <div className="crm-pipeline-grid">
+          {pipelineStages.map(stage => (
+            <div key={stage.id} className="crm-pipeline-stage">
+              <div className="crm-pipeline-stage-header">
+                <span>{stage.label}</span>
+                <strong>{stage.clients.length}</strong>
+              </div>
+              <div className="crm-pipeline-value">{formatCurrency(stage.value)}</div>
+              <div className="crm-pipeline-score">Avg score {stage.avgScore}/100</div>
+              <div className="crm-pipeline-clients">
+                {stage.clients.slice(0, 3).map(client => (
+                  <button
+                    key={client.id}
+                    className="crm-pipeline-client"
+                    onClick={() => handleViewProfile(client)}
+                  >
+                    <span>{client.name}</span>
+                    <span className={getLeadScoreClass(calculateLeadScore(client))}>
+                      {calculateLeadScore(client)}
+                    </span>
+                  </button>
+                ))}
+                {stage.clients.length === 0 && (
+                  <span className="crm-pipeline-empty">No clients in stage</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Client Cards Grid */}
       {filteredAndSortedClients.length === 0 ? (
         <div className="crm-empty-state">
@@ -575,6 +651,25 @@ const ClientsView: React.FC<ClientsViewProps> = ({ onSelectClient }) => {
                   <div className="crm-stat-label">History</div>
                 </div>
               </div>
+
+              <div className="crm-lead-score-row">
+                <div>
+                  <span className="crm-stat-label">Lead Score</span>
+                  <div className={`crm-lead-score ${getLeadScoreClass(calculateLeadScore(client))}`}>
+                    {calculateLeadScore(client)}/100
+                  </div>
+                </div>
+                <div className="crm-score-bar">
+                  <span style={{ width: `${calculateLeadScore(client)}%` }} />
+                </div>
+              </div>
+
+              {client.communicationHistory && client.communicationHistory.length > 0 && (
+                <div className="crm-communication-preview">
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>{client.communicationHistory[0].subject}</span>
+                </div>
+              )}
 
               {/* Quick Actions */}
               <div className="crm-client-actions mt-3 flex gap-2">
@@ -857,6 +952,27 @@ const ClientsView: React.FC<ClientsViewProps> = ({ onSelectClient }) => {
                 </div>
               </div>
 
+              {/* Lead Scoring */}
+              <div className="crm-profile-section">
+                <h4 className="crm-profile-section-title">
+                  <Target className="w-4 h-4 inline mr-1" />
+                  Lead Scoring
+                </h4>
+                <div className="crm-score-detail">
+                  <div className={`crm-score-number ${getLeadScoreClass(calculateLeadScore(selectedClient))}`}>
+                    {calculateLeadScore(selectedClient)}
+                  </div>
+                  <div className="crm-score-detail-body">
+                    <div className="crm-score-bar large">
+                      <span style={{ width: `${calculateLeadScore(selectedClient)}%` }} />
+                    </div>
+                    <p>
+                      {getLeadScoreReason(selectedClient)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Notes */}
               {selectedClient.notes && (
                 <div className="crm-profile-section">
@@ -865,6 +981,27 @@ const ClientsView: React.FC<ClientsViewProps> = ({ onSelectClient }) => {
                     Notes
                   </h4>
                   <div className="crm-notes-area">{selectedClient.notes}</div>
+                </div>
+              )}
+
+              {/* Communication History */}
+              {selectedClient.communicationHistory && selectedClient.communicationHistory.length > 0 && (
+                <div className="crm-profile-section">
+                  <h4 className="crm-profile-section-title">
+                    <MessageSquare className="w-4 h-4 inline mr-1" />
+                    Communication History
+                  </h4>
+                  <div className="crm-communication-history">
+                    {selectedClient.communicationHistory.map(item => (
+                      <div key={item.id} className="crm-communication-item">
+                        <div className="crm-communication-type">{item.type}</div>
+                        <div className="crm-communication-body">
+                          <p>{item.subject}</p>
+                          <span>{formatDate(item.date)} • {item.outcome}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -923,5 +1060,44 @@ const ClientsView: React.FC<ClientsViewProps> = ({ onSelectClient }) => {
     </div>
   );
 };
+
+function calculateLeadScore(client: CRMClient): number {
+  const revenueScore = Math.min(35, Math.round((client.totalRevenue || 0) / 2000));
+  const eventScore = Math.min(25, (client.eventsBooked || 0) * 5);
+  const statusScore = client.status === 'vip' ? 25 : client.status === 'active' ? 18 : client.status === 'lead' ? 10 : 2;
+  const contactScore = client.lastContact ? 10 : 0;
+  const historyScore = client.eventHistory?.some(event => event.status === 'upcoming') ? 5 : 0;
+
+  return Math.min(100, revenueScore + eventScore + statusScore + contactScore + historyScore);
+}
+
+function getLeadScoreReason(client: CRMClient): string {
+  const score = calculateLeadScore(client);
+  if (score >= 80) return 'High-value opportunity with strong revenue history and active engagement.';
+  if (score >= 55) return 'Healthy relationship with enough activity to justify proactive follow-up.';
+  return 'Needs qualification or reactivation before sales effort is prioritized.';
+}
+
+function buildCommunicationHistory(client: Partial<CRMClient>): ClientCommunication[] {
+  const fallbackDate = client.lastContact || client.createdAt || new Date().toISOString();
+  const contactName = client.contactPerson || client.name || 'Client';
+
+  return [
+    {
+      id: `${client.id || contactName}-last-contact`,
+      type: client.phone ? 'whatsapp' : 'email',
+      subject: `Follow-up with ${contactName}`,
+      date: fallbackDate,
+      outcome: client.status === 'lead' ? 'Qualification pending' : 'Relationship active'
+    },
+    {
+      id: `${client.id || contactName}-brief`,
+      type: 'call',
+      subject: 'Event requirements check-in',
+      date: client.createdAt || fallbackDate,
+      outcome: `${client.eventsBooked || 0} booked event${(client.eventsBooked || 0) === 1 ? '' : 's'} on record`
+    }
+  ];
+}
 
 export default ClientsView;

@@ -20,8 +20,11 @@ import {
   BarChart3,
   Users,
   CreditCard,
-  ArrowRight,
-  Loader2
+  Loader2,
+  Calculator,
+  Percent,
+  Bell,
+  LineChart
 } from 'lucide-react';
 import { StaffAssignment, MiscExpense, Staff } from '../types';
 
@@ -110,6 +113,7 @@ const Payroll: React.FC = () => {
   const [metrics, setMetrics] = useState<FinanceMetrics | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'pdf' | 'whatsapp'>('csv');
+  const [taxRate, setTaxRate] = useState(15);
 
   // ==========================================
   // DATA FETCHING - AUTONOMOUS BEHAVIOR
@@ -259,6 +263,48 @@ const Payroll: React.FC = () => {
     if (!payroll) return [];
     return payroll.staff.filter(s => s.paymentStatus === 'OVERDUE');
   }, [payroll]);
+
+  const taxSummary = useMemo(() => {
+    const grossPayroll = payroll?.summary.totalEarnings || 0;
+    const taxablePayroll = grossPayroll * 0.92;
+    const taxAmount = taxablePayroll * (taxRate / 100);
+    const netPayroll = grossPayroll - taxAmount;
+
+    return { grossPayroll, taxablePayroll, taxAmount, netPayroll };
+  }, [payroll, taxRate]);
+
+  const paymentReminderPlan = useMemo(() => {
+    const today = new Date();
+    return pendingPayments.map((staff, index) => {
+      const dueDate = new Date(today);
+      dueDate.setDate(today.getDate() + (staff.paymentStatus === 'OVERDUE' ? 0 : index + 1));
+
+      return {
+        staff,
+        dueDate,
+        priority: staff.paymentStatus === 'OVERDUE' ? 'Critical' : staff.paymentStatus === 'UNPAID' ? 'High' : 'Normal',
+        channel: staff.phone ? 'WhatsApp' : 'Manual follow-up'
+      };
+    });
+  }, [pendingPayments]);
+
+  const revenueForecast = useMemo(() => {
+    if (!metrics) return [];
+    const monthly = metrics.monthlyTotals;
+    const recent = monthly.slice(-3);
+    const baseline = recent.length
+      ? recent.reduce((sum, item) => sum + item.earnings, 0) / recent.length
+      : payroll?.summary.totalEarnings || 0;
+    const last = monthly[monthly.length - 1]?.earnings || baseline;
+    const previous = monthly[monthly.length - 2]?.earnings || last;
+    const growthRate = previous > 0 ? Math.max(-0.12, Math.min(0.18, (last - previous) / previous)) : 0.04;
+
+    return ['Next month', '+2 months', '+3 months'].map((label, index) => ({
+      label,
+      revenue: Math.round(baseline * Math.pow(1 + growthRate, index + 1)),
+      growthRate
+    }));
+  }, [metrics, payroll]);
 
   // ==========================================
   // PAYMENT ACTIONS
@@ -709,6 +755,117 @@ Flow Events Finance Team`;
     );
   };
 
+  const renderTaxCalculator = () => (
+    <div className="finance-agent-card">
+      <h3 className="finance-section-title">
+        <Calculator className="w-5 h-5" />
+        Tax Calculator
+      </h3>
+
+      <div className="finance-tax-rate-control">
+        <label>Payroll tax rate</label>
+        <div>
+          <input
+            type="number"
+            min="0"
+            max="45"
+            step="0.5"
+            value={taxRate}
+            onChange={(e) => setTaxRate(Number(e.target.value))}
+          />
+          <Percent className="w-4 h-4" />
+        </div>
+      </div>
+
+      <div className="finance-tax-breakdown">
+        <div>
+          <span>Gross payroll</span>
+          <strong>{formatCurrency(taxSummary.grossPayroll)}</strong>
+        </div>
+        <div>
+          <span>Taxable payroll</span>
+          <strong>{formatCurrency(taxSummary.taxablePayroll)}</strong>
+        </div>
+        <div>
+          <span>Estimated tax</span>
+          <strong className="text-yellow-400">{formatCurrency(taxSummary.taxAmount)}</strong>
+        </div>
+        <div>
+          <span>Net payroll</span>
+          <strong className="text-green-400">{formatCurrency(taxSummary.netPayroll)}</strong>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderPaymentReminderSystem = () => (
+    <div className="finance-agent-card">
+      <h3 className="finance-section-title">
+        <Bell className="w-5 h-5" />
+        Payment Reminders
+      </h3>
+
+      <div className="finance-reminder-list">
+        {paymentReminderPlan.slice(0, 4).map(reminder => (
+          <div key={reminder.staff.staffId} className="finance-reminder-item">
+            <div>
+              <p>{reminder.staff.fullName}</p>
+              <span>{reminder.channel} • {reminder.dueDate.toLocaleDateString('en-ZA')}</span>
+            </div>
+            <strong className={reminder.priority === 'Critical' ? 'text-red-400' : reminder.priority === 'High' ? 'text-yellow-400' : 'text-gray-300'}>
+              {reminder.priority}
+            </strong>
+          </div>
+        ))}
+
+        {paymentReminderPlan.length === 0 && (
+          <div className="finance-reminder-empty">
+            <CheckCircle className="w-5 h-5" />
+            No payment reminders due
+          </div>
+        )}
+      </div>
+
+      {paymentReminderPlan.length > 0 && (
+        <button
+          onClick={handleBulkWhatsApp}
+          className="finance-btn finance-btn-warning finance-btn-full"
+        >
+          <Send className="w-4 h-4" />
+          Send Due Reminders
+        </button>
+      )}
+    </div>
+  );
+
+  const renderRevenueForecast = () => (
+    <div className="finance-agent-card">
+      <h3 className="finance-section-title">
+        <LineChart className="w-5 h-5" />
+        Revenue Forecast
+      </h3>
+
+      <div className="finance-forecast-chart">
+        {revenueForecast.map(item => {
+          const maxRevenue = Math.max(...revenueForecast.map(forecast => forecast.revenue), 1);
+          return (
+            <div key={item.label} className="finance-forecast-row">
+              <span>{item.label}</span>
+              <div className="finance-forecast-track">
+                <div style={{ width: `${(item.revenue / maxRevenue) * 100}%` }} />
+              </div>
+              <strong>{formatCurrency(item.revenue)}</strong>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="finance-forecast-note">
+        Trend basis: {revenueForecast[0] ? `${(revenueForecast[0].growthRate * 100).toFixed(1)}%` : '0.0%'} monthly movement from recent payroll history.
+      </p>
+    </div>
+  );
+
   // ==========================================
   // MAIN RENDER
   // ==========================================
@@ -803,6 +960,9 @@ Flow Events Finance Team`;
         {/* Metrics Sidebar */}
         <div className="finance-sidebar">
           {renderMetricsChart()}
+          {renderTaxCalculator()}
+          {renderPaymentReminderSystem()}
+          {renderRevenueForecast()}
           
           {/* Quick Stats */}
           <div className="finance-quick-stats">

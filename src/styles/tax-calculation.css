@@ -1,0 +1,398 @@
+/**
+ * TAX CALCULATION STYLES
+ */
+
+.tax-calculation {
+  padding: 1.5rem;
+}
+
+/* Header */
+.tax-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+}
+
+.tax-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: white;
+  margin: 0 0 0.25rem 0;
+}
+
+.tax-subtitle {
+  font-size: 0.875rem;
+  color: #9CA3AF;
+  margin: 0;
+}
+
+.tax-settings-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(59, 130, 246, 0.15);
+  color: #3B82F6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tax-settings-btn:hover {
+  background: rgba(59, 130, 246, 0.25);
+}
+
+/* Invoice Selector */
+.invoice-selector {
+  margin-bottom: 1.5rem;
+}
+
+.invoice-selector label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #D1D5DB;
+  margin-bottom: 0.5rem;
+}
+
+.invoice-selector select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: rgba(17, 24, 39, 0.8);
+  border: 1px solid rgba(75, 85, 99, 0.5);
+  border-radius: 0.5rem;
+  color: white;
+  font-size: 0.875rem;
+}
+
+.invoice-selector select:focus {
+  outline: none;
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* Tax Details */
+.tax-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Invoice Summary */
+.invoice-summary {
+  background: rgba(31, 41, 55, 0.3);
+  border: 1px solid rgba(75, 85, 99, 0.3);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+}
+
+.invoice-summary h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  margin: 0 0 0.25rem 0;
+}
+
+.client-name {
+  font-size: 0.875rem;
+  color: #9CA3AF;
+  margin: 0 0 1rem 0;
+}
+
+.invoice-amounts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.amount-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+  color: #D1D5DB;
+}
+
+.amount-row.total {
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(75, 85, 99, 0.3);
+  font-weight: 600;
+}
+
+.amount-row.grand-total {
+  padding-top: 0.75rem;
+  border-top: 2px solid rgba(75, 85, 99, 0.5);
+  font-size: 1rem;
+  font-weight: 700;
+  color: white;
+}
+
+.tax-rate-input {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.tax-rate-input input {
+  width: 60px;
+  padding: 0.25rem 0.5rem;
+  background: rgba(17, 24, 39, 0.8);
+  border: 1px solid rgba(75, 85, 99, 0.5);
+  border-radius: 0.25rem;
+  color: white;
+  font-size: 0.875rem;
+  text-align: right;
+}
+
+.tax-rate-input svg {
+  width: 12px;
+  height: 12px;
+  color: #6B7280;
+}
+
+.tax-amount {
+  color: #F59E0B;
+  font-weight: 600;
+}
+
+/* Tax Breakdown Table */
+.tax-breakdown {
+  background: rgba(31, 41, 55, 0.3);
+  border: 1px solid rgba(75, 85, 99, 0.3);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+}
+
+.tax-breakdown h5 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #D1D5DB;
+  margin: 0 0 1rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tax-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.tax-table th {
+  text-align: left;
+  padding: 0.5rem;
+  color: #9CA3AF;
+  font-weight: 500;
+  border-bottom: 1px solid rgba(75, 85, 99, 0.3);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.tax-table td {
+  padding: 0.75rem 0.5rem;
+  color: #D1D5DB;
+  border-bottom: 1px solid rgba(75, 85, 99, 0.2);
+}
+
+.tax-value {
+  color: #F59E0B;
+  font-weight: 500;
+}
+
+.tax-total {
+  color: #10B981;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+/* Tax Compliance */
+.tax-compliance {
+  background: rgba(31, 41, 55, 0.3);
+  border: 1px solid rgba(75, 85, 99, 0.3);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+}
+
+.tax-compliance h5 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #D1D5DB;
+  margin: 0 0 1rem 0;
+}
+
+.compliance-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.compliance-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+}
+
+.compliance-item.passed {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10B981;
+}
+
+.compliance-item.warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: #F59E0B;
+}
+
+.compliance-item svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* Modal */
+.tax-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.tax-modal {
+  background: #1F2937;
+  border: 1px solid rgba(75, 85, 99, 0.5);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  width: 90%;
+  max-width: 500px;
+}
+
+.tax-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.tax-modal-header h4 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: white;
+  margin: 0;
+}
+
+.tax-modal-header button {
+  background: none;
+  border: none;
+  color: #9CA3AF;
+  cursor: pointer;
+}
+
+.tax-settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tax-settings-form label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #D1D5DB;
+  margin-bottom: 0.25rem;
+}
+
+.tax-settings-form input,
+.tax-settings-form select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: rgba(17, 24, 39, 0.8);
+  border: 1px solid rgba(75, 85, 99, 0.5);
+  border-radius: 0.5rem;
+  color: white;
+  font-size: 0.875rem;
+}
+
+.tax-settings-form input:focus,
+.tax-settings-form select:focus {
+  outline: none;
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.jurisdiction-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.jurisdiction-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: rgba(17, 24, 39, 0.5);
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  color: #D1D5DB;
+}
+
+.remove-btn {
+  background: none;
+  border: none;
+  color: #EF4444;
+  cursor: pointer;
+  padding: 0.125rem;
+}
+
+.remove-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.add-jurisdiction-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(59, 130, 246, 0.1);
+  color: #3B82F6;
+  border: 1px dashed rgba(59, 130, 246, 0.3);
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.add-jurisdiction-btn:hover {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.save-settings-btn {
+  width: 100%;
+  padding: 0.75rem;
+  background: #3B82F6;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.save-settings-btn:hover {
+  background: #2563EB;
+}
