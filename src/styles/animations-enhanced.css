@@ -615,6 +615,27 @@ select:focus-visible {
 }
 
 /* ==========================================
+   GRADIENT BORDER HOVER
+   Premium card hover effect
+   ========================================== */
+
+.gradient-border {
+  position: relative;
+  border: 2px solid transparent;
+  background: 
+    linear-gradient(var(--bg-glass), var(--bg-glass)) padding-box,
+    linear-gradient(135deg, var(--gold-500), var(--blue-500), var(--purple-500)) border-box;
+  background-origin: padding-box, border-box;
+  background-clip: padding-box, border-box;
+  transition: all 0.3s ease;
+}
+
+.gradient-border:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(191, 143, 59, 0.2);
+}
+
+/* ==========================================
    SHIMMER LOADING EFFECT
    For loading skeletons
    ========================================== */
