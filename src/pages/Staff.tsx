@@ -666,6 +666,22 @@ const Staff = () => {
                               <Send size={16} />
                             </button>
                           )}
+                          {staff.staffPhone && (
+                            <a
+                              href={`tel:${staff.staffPhone}`}
+                              className="p-2 text-gray-400 hover:text-blue-400 transition-colors"
+                              title="Call Staff"
+                            >
+                              <Phone size={16} />
+                            </a>
+                          )}
+                          <button
+                            onClick={() => alert(`Assign ${staff.staffName} to event - Feature coming soon!`)}
+                            className="p-2 text-gray-400 hover:text-[#BF8F3B] transition-colors"
+                            title="Assign to Event"
+                          >
+                            <Calendar size={16} />
+                          </button>
                           <button
                             onClick={() => handleEdit(staff)}
                             className="p-2 text-gray-400 hover:text-[#BF8F3B] transition-colors"
