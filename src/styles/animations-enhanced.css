@@ -613,3 +613,43 @@ select:focus-visible {
     transition: none;
   }
 }
+
+/* ==========================================
+   SHIMMER LOADING EFFECT
+   For loading skeletons
+   ========================================== */
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(
+    to right,
+    var(--bg-tertiary) 0%,
+    var(--bg-secondary) 20%,
+    var(--bg-tertiary) 40%,
+    var(--bg-tertiary) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite linear;
+}
+
+.shimmer-text {
+  background: linear-gradient(
+    to right,
+    var(--bg-tertiary) 0%,
+    var(--bg-secondary) 20%,
+    var(--bg-tertiary) 40%,
+    var(--bg-tertiary) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite linear;
+  border-radius: 4px;
+  color: transparent;
+}
