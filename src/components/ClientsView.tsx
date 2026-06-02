@@ -557,7 +557,6 @@ const ClientsView: React.FC<ClientsViewProps> = ({ onSelectClient }) => {
                     <span>{client.address}</span>
                   </div>
                 )}
-              </div>
 
               {/* Client Stats */}
               <div className="crm-client-stats">
@@ -576,6 +575,43 @@ const ClientsView: React.FC<ClientsViewProps> = ({ onSelectClient }) => {
                   <div className="crm-stat-label">History</div>
                 </div>
               </div>
+
+              {/* Quick Actions */}
+              <div className="crm-client-actions mt-3 flex gap-2">
+                {client.phone && (
+                  <>
+                    <a
+                      href={`tel:${client.phone}`}
+                      className="p-2 text-gray-400 hover:text-blue-400 transition-colors"
+                      title="Call Client"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Phone className="w-4 h-4" />
+                    </a>
+                    <a
+                      href={`https://wa.me/${client.phone.replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 text-gray-400 hover:text-green-400 transition-colors"
+                      title="WhatsApp Client"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Send className="w-4 h-4" />
+                    </a>
+                  </>
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewProfile(client);
+                  }}
+                  className="p-2 text-gray-400 hover:text-[#BF8F3B] transition-colors"
+                  title="View Profile"
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
 
               {/* Actions */}
               <div className="crm-client-actions" onClick={(e) => e.stopPropagation()}>
