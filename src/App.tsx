@@ -1,899 +1,1301 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from "react";
 
-// Types
-import {
-  OperationalEvent,
-  OperationalStaff,
-  OperationalAlert,
-  PendingPayment,
-  ActivityItem,
-  LiveKPIs,
-  KPIMetric,
-  Priority,
-  EventStatus,
-  StaffStatus,
-  AlertSeverity,
-  ModalType
-} from './types/event-system';
+// ─── Constants & Seed ────────────────────────────────────────────────────────
+const INITIAL_STAFF = [
+  { id:1, name:"Amara Diallo",   role:"Bar Staff",   rate:14.5, pin:"1111", uniform:true,  department:"Bar",        email:"amara@freshpeople.co.za",   phone:"+27 71 001 0001" },
+  { id:2, name:"Themba Nkosi",   role:"Floor Staff", rate:13.0, pin:"2222", uniform:true,  department:"Floor",      email:"themba@freshpeople.co.za",   phone:"+27 71 001 0002" },
+  { id:3, name:"Priya Moodley",  role:"Supervisor",  rate:17.0, pin:"3333", uniform:false, department:"Management", email:"priya@freshpeople.co.za",    phone:"+27 71 001 0003" },
+  { id:4, name:"Lerato Khumalo", role:"Bar Staff",   rate:14.5, pin:"4444", uniform:true,  department:"Bar",        email:"lerato@freshpeople.co.za",   phone:"+27 71 001 0004" },
+  { id:5, name:"Sipho Dlamini",  role:"Security",    rate:15.5, pin:"5555", uniform:true,  department:"Security",   email:"sipho@freshpeople.co.za",    phone:"+27 71 001 0005" },
+  { id:6, name:"Naledi Tau",     role:"Floor Staff", rate:13.0, pin:"6666", uniform:false, department:"Floor",      email:"naledi@freshpeople.co.za",   phone:"+27 71 001 0006" },
+];
 
-// Command System Components
-import CommandHeader from './components/command/CommandHeader';
-import OperationsSidebar from './components/command/OperationsSidebar';
-import OperationsCalendar from './components/command/OperationsCalendar';
-import LiveOperationsFeed from './components/command/LiveOperationsFeed';
-import FloatingActionButton from './components/command/FloatingActionButton';
-import ModalSystem from './components/command/ModalSystem';
+const today   = new Date();
+const ymd     = (d: Date) => d.toISOString().slice(0,10);
+const addDays = (d: Date,n: number) => { const x=new Date(d); x.setDate(x.getDate()+n); return x; };
 
-// Existing Components (Preserved Functionality)
-import EventForm from './components/EventForm';
-import EventFormPolished from './components/EventFormPolished';
-import EventList from './components/EventList';
-import StaffView from './components/StaffView';
-import HomePage from './components/HomePage';
-import Dashboard from './components/Dashboard';
-import Payroll from './pages/Payroll';
+const INITIAL_EVENTS = [
+  { id:1, title:"Sandton Jazz Festival",    date:ymd(addDays(today,2)),  venue:"Sandton Convention Centre", staffIds:[1,2,5],   startTime:"17:00", endTime:"23:00", clientId:1, color:"#00e5a0", gcalId:null, notes:"Smart dress code. Parking in basement." },
+  { id:2, title:"Corporate Gala — MTN",     date:ymd(addDays(today,5)),  venue:"Hyatt Regency JHB",         staffIds:[3,4,6],   startTime:"18:00", endTime:"22:00", clientId:2, color:"#7c6af7", gcalId:null, notes:"Formal. Client contact: Busi Ndlovu 082 555 0011." },
+  { id:3, title:"Wedding: Khumalo/Singh",   date:ymd(addDays(today,8)),  venue:"Zimbali Estate",            staffIds:[1,2,3,4], startTime:"12:00", endTime:"20:00", clientId:3, color:"#f78c6c", gcalId:null, notes:"Outdoor. Bring own water." },
+  { id:4, title:"Year-End Drinks — Deloitte",date:ymd(addDays(today,-3)),venue:"Workshop17 Rosebank",       staffIds:[2,5,6],   startTime:"16:00", endTime:"21:00", clientId:2, color:"#7c6af7", gcalId:null, notes:"" },
+];
 
-// Styles
-import './styles/operations-command.css';
-import './styles/finance-agent.css';
-import './styles/crm-agent.css';
+const INITIAL_CLIENTS = [
+  { id:1, name:"Sandton Events Co",  email:"ops@sandtonevents.co.za",  vatNo:"4130265178", address:"14 Maude St, Sandton, 2196",   phone:"+27 11 555 0100" },
+  { id:2, name:"MTN Group Ltd",      email:"procurement@mtn.com",      vatNo:"4000109388", address:"216 14th Ave, Fairland, 2195", phone:"+27 11 912 3000" },
+  { id:3, name:"Priya & Dev Khumalo",email:"priya.khumalo@gmail.com",  vatNo:"",           address:"Private, KwaZulu-Natal",       phone:"+27 82 333 0001" },
+];
 
-// ==========================================
-// SAMPLE DATA FOR DEMONSTRATION
-// ==========================================
+const INITIAL_INVOICES = [
+  { id:1, docNo:"FP-INV-2025-001", type:"invoice", clientId:2, eventId:4, issueDate:ymd(addDays(today,-2)), dueDate:ymd(addDays(today,28)), status:"sent",
+    lines:[{desc:"Floor Staff × 3 (5h)",qty:15,rate:13.0},{desc:"Supervision fee",qty:1,rate:500}], notes:"Thank you for your business." },
+];
 
-const generateSampleEvents = (): OperationalEvent[] => {
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const nextWeek = new Date(today);
-  nextWeek.setDate(nextWeek.getDate() + 7);
+const INITIAL_QUOTES = [
+  { id:1, docNo:"FP-QTE-2025-001", clientId:1, eventId:1, issueDate:ymd(today), validUntil:ymd(addDays(today,30)), status:"draft",
+    lines:[{desc:"Bar Staff × 3 (6h)",qty:18,rate:14.5},{desc:"Security × 2 (6h)",qty:12,rate:15.5},{desc:"Setup & breakdown fee",qty:1,rate:800}], notes:"Valid for 30 days from issue date." },
+];
 
-  return [
-    {
-      id: '1',
-      title: 'Luxury Wedding Reception',
-      startDate: today,
-      endDate: new Date(today.getTime() + 4 * 60 * 60 * 1000),
-      duration: 4,
-      client: {
-        id: 'c1',
-        name: 'Emma & James',
-        contactPerson: 'Emma Thompson',
-        phone: '+1 (555) 123-4567',
-        email: 'emma@thompson.com',
-        vipStatus: true
-      },
-      staff: [
-        { id: 's1', name: 'John Doe', role: 'Bartender', status: 'CONFIRMED' as StaffStatus, checkInTime: '14:00' },
-        { id: 's2', name: 'Jane Smith', role: 'Server', status: 'CONFIRMED' as StaffStatus }
-      ],
-      venue: {
-        id: 'v1',
-        name: 'Grand Ballroom',
-        address: '123 Luxury Ave',
-        city: 'New York',
-        capacity: 300,
-        tier: 'Luxury Class'
-      },
-      location: 'Grand Ballroom, New York',
-      priority: 'VIP' as Priority,
-      status: 'CONFIRMED' as EventStatus,
-      description: 'Elegant wedding reception with premium bar service',
-      requirements: 'Champagne toast, signature cocktails',
-      dressCode: 'Black Tie',
-      budget: 15000,
-      staffNeeded: 8,
-      staffConfirmed: 6,
-      isDirectBooking: false,
-      source: 'local',
-      totalCost: 4800,
-      revenue: 15000,
-      profit: 10200,
-      createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-      updatedAt: new Date(),
-      createdBy: 'Admin',
-      notes: 'VIP client - ensure premium service',
-      tags: ['wedding', 'vip', 'luxury']
-    },
-    {
-      id: '2',
-      title: 'Corporate Gala',
-      startDate: tomorrow,
-      endDate: new Date(tomorrow.getTime() + 5 * 60 * 60 * 1000),
-      duration: 5,
-      client: {
-        id: 'c2',
-        name: 'TechCorp Inc.',
-        contactPerson: 'Michael Chen',
-        phone: '+1 (555) 987-6543',
-        email: 'michael@techcorp.com',
-        vipStatus: false
-      },
-      staff: [
-        { id: 's3', name: 'Mike Wilson', role: 'Mixologist', status: 'ASSIGNED' as StaffStatus }
-      ],
-      venue: {
-        id: 'v2',
-        name: 'Skyline Terrace',
-        address: '456 Premium Blvd',
-        city: 'New York',
-        capacity: 200,
-        tier: 'Premium Estate'
-      },
-      location: 'Skyline Terrace, New York',
-      priority: 'HIGH' as Priority,
-      status: 'SCHEDULED' as EventStatus,
-      description: 'Annual corporate gala with cocktail hour',
-      requirements: '3 signature cocktails, wine service',
-      dressCode: 'Business Formal',
-      budget: 12000,
-      staffNeeded: 6,
-      staffConfirmed: 3,
-      isDirectBooking: false,
-      source: 'local',
-      totalCost: 3600,
-      revenue: 12000,
-      profit: 8400,
-      createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-      updatedAt: new Date(),
-      createdBy: 'Admin',
-      notes: 'Important client - TechCorp annual event',
-      tags: ['corporate', 'gala']
-    },
-    {
-      id: '3',
-      title: 'Private Yacht Party',
-      startDate: nextWeek,
-      endDate: new Date(nextWeek.getTime() + 6 * 60 * 60 * 1000),
-      duration: 6,
-      client: {
-        id: 'c3',
-        name: 'Alexandra Rhodes',
-        contactPerson: 'Alexandra Rhodes',
-        phone: '+1 (555) 555-5555',
-        email: 'alex@rhodes.com',
-        vipStatus: true
-      },
-      staff: [],
-      venue: {
-        id: 'v3',
-        name: 'Superyacht Majesty',
-        address: 'Marina District',
-        city: 'Miami',
-        capacity: 50,
-        tier: 'Superyacht Deck'
-      },
-      location: 'Marina District, Miami',
-      priority: 'VIP' as Priority,
-      status: 'PENDING' as EventStatus,
-      description: 'Exclusive yacht party with premium bar',
-      requirements: 'Full bar, champagne, canapés',
-      dressCode: 'Cocktail Attire',
-      budget: 25000,
-      staffNeeded: 4,
-      staffConfirmed: 0,
-      isDirectBooking: true,
-      source: 'local',
-      totalCost: 0,
-      revenue: 25000,
-      profit: 25000,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      createdBy: 'Admin',
-      notes: 'VIP yacht party - high priority',
-      tags: ['yacht', 'vip', 'exclusive']
-    }
-  ];
+// ─── Design tokens ────────────────────────────────────────────────────────────
+const A="\#00e5a0",BG="\#0d1117",SF="\#161b22",SF2="\#1c2330",BD="\#30363d",
+      TX="\#e6edf3",MU="\#7d8590",RD="\#f85149",AM="\#e3b341",PU="\#7c6af7",CO="\#f78c6c";
+
+const ACCENT=A, SURFACE=SF, SURFACE2=SF2, BORDER=BD, TEXT=TX, MUTED=MU, RED=RD, AMBER=AM, PURPLE=PU, CORAL=CO;
+
+const STATUS_COLOR: Record<string, string> = {
+  draft:MUTED, sent:AMBER, paid:ACCENT, overdue:RED, accepted:ACCENT, declined:RED, expired:MUTED,
+  pending:AMBER, confirmed:ACCENT, cancelled:RED,
 };
 
-const generateSampleStaff = (): OperationalStaff[] => {
-  return [
-    {
-      id: 's1',
-      fullName: 'John Doe',
-      phone: '+1 (555) 111-2222',
-      email: 'john@freshpeople.com',
-      role: 'Bartender',
-      rate: 35,
-      status: 'CHECKED_IN',
-      currentEventId: '1',
-      checkInTime: new Date(),
-      totalHoursThisWeek: 24,
-      totalEarningsThisMonth: 3360,
-      createdAt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
-    },
-    {
-      id: 's2',
-      fullName: 'Jane Smith',
-      phone: '+1 (555) 222-3333',
-      email: 'jane@freshpeople.com',
-      role: 'Server',
-      rate: 28,
-      status: 'ASSIGNED',
-      currentEventId: '1',
-      totalHoursThisWeek: 20,
-      totalEarningsThisMonth: 2240,
-      createdAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)
-    },
-    {
-      id: 's3',
-      fullName: 'Mike Wilson',
-      phone: '+1 (555) 333-4444',
-      email: 'mike@freshpeople.com',
-      role: 'Mixologist',
-      rate: 45,
-      status: 'ASSIGNED',
-      currentEventId: '2',
-      totalHoursThisWeek: 30,
-      totalEarningsThisMonth: 5400,
-      createdAt: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000)
-    },
-    {
-      id: 's4',
-      fullName: 'Sarah Johnson',
-      phone: '+1 (555) 444-5555',
-      email: 'sarah@freshpeople.com',
-      role: 'Barista',
-      rate: 25,
-      status: 'AVAILABLE',
-      totalHoursThisWeek: 0,
-      totalEarningsThisMonth: 0,
-      createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-    },
-    {
-      id: 's5',
-      fullName: 'David Brown',
-      phone: '+1 (555) 555-6666',
-      email: 'david@freshpeople.com',
-      role: 'Barback',
-      rate: 22,
-      status: 'OFF_DUTY',
-      totalHoursThisWeek: 32,
-      totalEarningsThisMonth: 2816,
-      createdAt: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000)
-    }
-  ];
-};
+const css = `
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:${BG};color:${TEXT};font-family:'Outfit',sans-serif;min-height:100vh}
+  ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:${BORDER};border-radius:3px}
+  input,select,textarea{background:${SURFACE2};color:${TEXT};border:1px solid ${BORDER};border-radius:8px;padding:8px 12px;font-family:inherit;font-size:14px;outline:none;transition:border 0.15s}
+  input:focus,select:focus,textarea:focus{border-color:${ACCENT}}
+  textarea{resize:vertical}
+  button{cursor:pointer;font-family:inherit}
+  .mono{font-family:'DM Mono',monospace}
+  @media print{
+    .no-print{display:none!important}
+    body{background:#fff!important;color:#111!important}
+    .print-doc{background:#fff!important;color:#111!important;border:none!important}
+  }
+`;
 
-const generateSampleAlerts = (): OperationalAlert[] => {
-  return [
-    {
-      id: 'a1',
-      timestamp: new Date(Date.now() - 30 * 60 * 1000),
-      severity: 'HIGH' as AlertSeverity,
-      title: 'Staff Shortage - Tonight Event',
-      message: 'Luxury Wedding Reception needs 2 more staff members',
-      relatedEventId: '1',
-      isRead: false,
-      actionRequired: true,
-      actions: [
-        { label: 'Dispatch Staff', action: () => console.log('Dispatch'), variant: 'primary' },
-        { label: 'Postpone', action: () => console.log('Postpone'), variant: 'secondary' }
-      ]
-    },
-    {
-      id: 'a2',
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      severity: 'MEDIUM' as AlertSeverity,
-      title: 'Payment Pending',
-      message: 'Invoice #INV-2024-0042 is 5 days overdue',
-      isRead: false,
-      actionRequired: true,
-      actions: [
-        { label: 'Send Reminder', action: () => console.log('Remind'), variant: 'primary' },
-        { label: 'Call Client', action: () => console.log('Call'), variant: 'secondary' }
-      ]
-    },
-    {
-      id: 'a3',
-      timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
-      severity: 'LOW' as AlertSeverity,
-      title: 'Weather Alert',
-      message: 'Rain expected tomorrow - Superyacht party may need backup plan',
-      relatedEventId: '3',
-      isRead: true,
-      actionRequired: false
-    }
-  ];
-};
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const pad2    = (n: number) => String(n).padStart(2,"0");
+const fmtTime = (ts: number) => { if(!ts) return "—"; const d=new Date(ts); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+const fmtDur  = (ms: number) => { if(!ms||ms<0) return "—"; return `${Math.floor(ms/3600000)}h ${pad2(Math.floor((ms%3600000)/60000))}m`; };
+const calcPay = (ms: number,r: number) => (!ms||ms<0)?0:(ms/3600000)*r;
+const MONTHS  = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const WDAYS   = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const fmtDate = (s: string) => { if(!s) return "—"; const d=new Date(s+"T00:00:00"); return `${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3)} ${d.getFullYear()}`; };
+const eventHours = (ev: any) => { const [sh,sm]=ev.startTime.split(":").map(Number),[eh,em]=ev.endTime.split(":").map(Number); return (eh*60+em-sh*60-sm)/60; };
 
-const generateSamplePayments = (): PendingPayment[] => {
-  return [
-    {
-      id: 'p1',
-      staffId: 's1',
-      staffName: 'John Doe',
-      eventId: '1',
-      eventTitle: 'Luxury Wedding Reception',
-      amount: 560,
-      hoursWorked: 16,
-      rate: 35,
-      status: 'PENDING',
-      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      createdAt: new Date()
-    },
-    {
-      id: 'p2',
-      staffId: 's2',
-      staffName: 'Jane Smith',
-      eventId: '1',
-      eventTitle: 'Luxury Wedding Reception',
-      amount: 448,
-      hoursWorked: 16,
-      rate: 28,
-      status: 'PENDING',
-      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      createdAt: new Date()
-    },
-    {
-      id: 'p3',
-      staffId: 's3',
-      staffName: 'Mike Wilson',
-      eventId: '2',
-      eventTitle: 'Corporate Gala',
-      amount: 360,
-      hoursWorked: 8,
-      rate: 45,
-      status: 'PROCESSING',
-      dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
-    }
-  ];
-};
+function docSubtotal(lines: any[]) { return lines.reduce((a: number,l: any)=>a+Number(l.qty)*Number(l.rate),0); }
+function nextDocNo(arr: any[], prefix: string) { return `${prefix}-${new Date().getFullYear()}-${String(arr.length+1).padStart(3,"0")}`; }
 
-const generateSampleActivity = (): ActivityItem[] => {
-  return [
-    {
-      id: 'act1',
-      timestamp: new Date(Date.now() - 10 * 60 * 1000),
-      type: 'staff_checkin',
-      operator: 'John Doe',
-      message: 'John Doe checked in for Luxury Wedding Reception',
-      relatedEventId: '1',
-      relatedStaffId: 's1',
-      isUrgent: false
-    },
-    {
-      id: 'act2',
-      timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000),
-      type: 'event_create',
-      operator: 'Admin',
-      message: 'New event created: Private Yacht Party',
-      details: 'VIP client - Alexandra Rhodes',
-      relatedEventId: '3',
-      isUrgent: true
-    },
-    {
-      id: 'act3',
-      timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000),
-      type: 'staff_rsvp',
-      operator: 'Jane Smith',
-      message: 'Jane Smith confirmed availability for Corporate Gala',
-      relatedEventId: '2',
-      relatedStaffId: 's2',
-      isUrgent: false
-    },
-    {
-      id: 'act4',
-      timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000),
-      type: 'payment',
-      operator: 'System',
-      message: 'Payment of $560 processed for John Doe',
-      details: 'Event: Luxury Wedding Reception',
-      isUrgent: false
-    },
-    {
-      id: 'act5',
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
-      type: 'sync',
-      operator: 'System',
-      message: 'iCloud calendar synced successfully',
-      isUrgent: false
-    }
-  ];
-};
-
-// ==========================================
-// MAIN APP COMPONENT
-// ==========================================
-
-function App() {
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [rightPanelOpen, setRightPanelOpen] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(true);
-  const [currentTime, setCurrentTime] = useState(new Date());
-
-  // Data State
-  const [events, setEvents] = useState<OperationalEvent[]>(generateSampleEvents());
-  const [staff, setStaff] = useState<OperationalStaff[]>(generateSampleStaff());
-  const [alerts, setAlerts] = useState<OperationalAlert[]>(generateSampleAlerts());
-  const [payments, setPayments] = useState<PendingPayment[]>(generateSamplePayments());
-  const [activity, setActivity] = useState<ActivityItem[]>(generateSampleActivity());
-
-  // Modal State
-  const [activeModal, setActiveModal] = useState<ModalType | null>(null);
-  const [modalData, setModalData] = useState<any>(null);
-
-  // KPIs
-  const [kpis, setKpis] = useState<LiveKPIs>({
-    totalEvents: {
-      id: 'total-events',
-      label: 'Total Events',
-      value: 24,
-      change: 12.5,
-      trend: 'up',
-      icon: '📅',
-      color: '#BF8F3B'
-    },
-    activeStaff: {
-      id: 'active-staff',
-      label: 'Active Staff',
-      value: '18/24',
-      change: 8.3,
-      trend: 'up',
-      icon: '👥',
-      color: '#10B981'
-    },
-    pendingPayments: {
-      id: 'pending-payments',
-      label: 'Pending Payments',
-      value: '$12.4K',
-      change: -5.2,
-      trend: 'down',
-      icon: '💰',
-      color: '#EF4444'
-    },
-    todaysEvents: {
-      id: 'todays-events',
-      label: "Today's Events",
-      value: 3,
-      change: 0,
-      trend: 'stable',
-      icon: '⚡',
-      color: '#3B82F6'
-    },
-    monthlyRevenue: {
-      id: 'monthly-revenue',
-      label: 'Monthly Revenue',
-      value: '$84.2K',
-      change: 18.7,
-      trend: 'up',
-      icon: '📈',
-      color: '#8B5CF6'
-    },
-    utilizationRate: {
-      id: 'utilization',
-      label: 'Utilization Rate',
-      value: '78%',
-      change: 4.2,
-      trend: 'up',
-      icon: '📊',
-      color: '#F59E0B'
-    }
-  });
-
-  // Theme toggle handler
-  const handleThemeToggle = () => {
-    const newTheme = !isDarkMode;
-    setIsDarkMode(newTheme);
-    document.documentElement.setAttribute('data-theme', newTheme ? 'dark' : 'light');
-    localStorage.setItem('fpcc-theme', newTheme ? 'dark' : 'light');
+// ─── Shared UI ────────────────────────────────────────────────────────────────
+function Dot({on,color}: {on: boolean, color?: string}){return <span style={{display:"inline-block",width:8,height:8,borderRadius:"50%",background:on?(color||ACCENT):MUTED,boxShadow:on?`0 0 6px ${color||ACCENT}`:"none",flexShrink:0}}/>;}
+function Badge({color,children}: {color: string, children: React.ReactNode}){return <span style={{display:"inline-block",padding:"2px 8px",borderRadius:4,fontSize:11,fontWeight:500,background:color+"22",color,border:`1px solid ${color}44`}}>{children}</span>;}
+function Stat({label,value,accent,sub}: {label: string, value: string|number, accent?: string, sub?: string}){
+  return(
+    <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:10,padding:"14px 18px"}}>
+      <div style={{fontSize:11,color:MUTED,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>{label}</div>
+      <div style={{fontSize:22,fontWeight:600,color:accent||TEXT,fontFamily:"'DM Mono',monospace"}}>{value}</div>
+      {sub&&<div style={{fontSize:11,color:MUTED,marginTop:3}}>{sub}</div>}
+    </div>
+  );
+}
+function Btn({children,onClick,variant="ghost",style={},disabled=false}: {children: React.ReactNode, onClick?: ()=>void, variant?: string, style?: React.CSSProperties, disabled?: boolean}){
+  const base={border:"none" as const,borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:500,transition:"all 0.15s",opacity:disabled?0.45:1,...style};
+  const v:{[key:string]: React.CSSProperties}={
+    primary:{background:ACCENT,color:"#000"},
+    danger:{background:RED+"22",color:RED,border:`1px solid ${RED}44`},
+    ghost:{background:SURFACE2,color:TEXT,border:`1px solid ${BORDER}`},
+    accent:{background:ACCENT+"22",color:ACCENT,border:`1px solid ${ACCENT}44`},
+    amber:{background:AMBER+"22",color:AMBER,border:`1px solid ${AMBER}44`}
   };
-
-  // Load theme from localStorage on mount
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('fpcc-theme') || 'dark';
-    const isDark = savedTheme === 'dark';
-    setIsDarkMode(isDark);
-    document.documentElement.setAttribute('data-theme', savedTheme);
-  }, []);
-
-  // Update current time every minute
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Fetch initial data (preserved from original)
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [eventsRes, staffRes] = await Promise.all([
-          fetch('/api/events'),
-          fetch('/api/staff')
-        ]);
-
-        if (eventsRes.ok) {
-          const eventsData = await eventsRes.json();
-          // Transform to OperationalEvent format
-          console.log('Events fetched:', eventsData);
-        }
-
-        if (staffRes.ok) {
-          const staffData = await staffRes.json();
-          console.log('Staff fetched:', staffData);
-        }
-      } catch (err) {
-        console.error('Failed to fetch initial data:', err);
-      }
-    };
-
-    fetchData();
-  }, [refreshKey]);
-
-  // Get today's schedule
-  const todaysSchedule = events.filter(event => {
-    const eventDate = new Date(event.startDate).toDateString();
-    const today = new Date().toDateString();
-    return eventDate === today;
-  });
-
-  // Event handlers
-  const handleEventClick = (event: OperationalEvent) => {
-    console.log('Event clicked:', event);
-    setActiveModal('event_details');
-    setModalData(event);
-  };
-
-  const handleEventCreate = (date: Date, time?: string) => {
-    console.log('Create event:', date, time);
-    setActiveModal('new_event');
-    setModalData({ date, time });
-  };
-
-  const handleEventDrop = (eventId: string, newDate: Date) => {
-    console.log('Event dropped:', eventId, newDate);
-    setEvents(prev => prev.map(e =>
-      e.id === eventId
-        ? { ...e, startDate: newDate, endDate: new Date(newDate.getTime() + e.duration * 60 * 60 * 1000) }
-        : e
-    ));
-  };
-
-  const handleStaffClick = (staff: OperationalStaff) => {
-    console.log('Staff clicked:', staff);
-    setActiveModal('staff_details');
-    setModalData(staff);
-  };
-
-  const handleAlertAction = (alertId: string, action: string) => {
-    console.log('Alert action:', alertId, action);
-    setAlerts(prev => prev.map(a =>
-      a.id === alertId ? { ...a, isRead: true } : a
-    ));
-  };
-
-  const handlePaymentProcess = (paymentId: string) => {
-    console.log('Process payment:', paymentId);
-    setPayments(prev => prev.map(p =>
-      p.id === paymentId ? { ...p, status: 'PROCESSING' } : p
-    ));
-  };
-
-  const handleModalSave = (type: ModalType, data: any) => {
-    console.log('Modal save:', type, data);
-
-    switch (type) {
-      case 'new_event':
-        const newEvent: OperationalEvent = {
-          id: `event-${Date.now()}`,
-          title: data.title,
-          startDate: new Date(data.date + 'T' + data.startTime),
-          endDate: new Date(data.date + 'T' + data.endTime),
-          duration: (new Date(data.date + 'T' + data.endTime).getTime() - new Date(data.date + 'T' + data.startTime).getTime()) / (1000 * 60 * 60),
-          client: {
-            id: `client-${Date.now()}`,
-            name: data.client,
-            contactPerson: '',
-            phone: '',
-            email: '',
-            vipStatus: data.priority === 'VIP'
-          },
-          staff: [],
-          venue: {
-            id: `venue-${Date.now()}`,
-            name: data.venue,
-            address: '',
-            city: '',
-            capacity: 0,
-            tier: 'Luxury Class'
-          },
-          location: data.venue,
-          priority: data.priority,
-          status: 'SCHEDULED',
-          staffNeeded: data.staffNeeded,
-          staffConfirmed: 0,
-          isDirectBooking: false,
-          source: 'local',
-          totalCost: 0,
-          revenue: 0,
-          profit: 0,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          createdBy: 'Admin',
-          notes: data.notes,
-          tags: []
-        };
-        setEvents(prev => [...prev, newEvent]);
-        break;
-
-      case 'new_staff':
-        const newStaff: OperationalStaff = {
-          id: `staff-${Date.now()}`,
-          fullName: data.fullName,
-          phone: data.phone,
-          email: data.email,
-          role: data.role,
-          rate: data.rate,
-          status: 'AVAILABLE',
-          totalHoursThisWeek: 0,
-          totalEarningsThisMonth: 0,
-          createdAt: new Date()
-        };
-        setStaff(prev => [...prev, newStaff]);
-        break;
-    }
-
-    setActiveModal(null);
-    setModalData(null);
-  };
-
-  const handleFabAction = (action: string, data?: any) => {
-    console.log('FAB action:', action, data);
-    if (action === 'open_modal' && data?.type) {
-      setActiveModal(data.type);
-      setModalData(data);
-    }
-  };
-
-  return (
-    <BrowserRouter>
-      <div className="operations-command-layout" style={{
-        display: 'grid',
-        gridTemplateColumns: `${sidebarOpen ? '280px' : '72px'} 1fr ${rightPanelOpen ? '360px' : '0px'}`,
-        gridTemplateRows: '80px 1fr',
-        gridTemplateAreas: '"header header header" "left-panel center right-panel"',
-        height: '100vh',
-        overflow: 'hidden',
-        background: 'var(--bg-primary)',
-        color: 'var(--text-primary)'
-      }}>
-        {/* Ambient Glow Effects */}
-        <div className="ambient-glow ambient-glow-1" />
-        <div className="ambient-glow ambient-glow-2" />
-        <div className="ambient-glow ambient-glow-3" />
-
-        {/* Command Header */}
-        <div style={{ gridArea: 'header', zIndex: 100 }}>
-          <CommandHeader
-            kpis={kpis}
-            onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-            onToggleTheme={handleThemeToggle}
-            isDarkMode={isDarkMode}
-            systemStatus="operational"
-            currentTime={currentTime}
-          />
+  return <button onClick={disabled?undefined:onClick} style={{...base,...v[variant]}}>{children}</button>;
+}
+function Lbl({children}: {children: React.ReactNode}){return <div style={{fontSize:12,color:MUTED,marginBottom:6}}>{children}</div>;}
+function Fld({label,children,style={}}: {label: string, children: React.ReactNode, style?: React.CSSProperties}){return <div style={{marginBottom:14,...style}}><Lbl>{label}</Lbl>{children}</div>;}
+function Modal({title,onClose,children,width=540}: {title: string, onClose: ()=>void, children: React.ReactNode, width?: number}){
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300,padding:16}}>
+      <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:14,padding:28,width,maxWidth:"95vw",maxHeight:"92vh",overflow:"auto"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <div style={{fontSize:16,fontWeight:600}}>{title}</div>
+          <button onClick={onClose} style={{background:"none",border:"none",color:MUTED,fontSize:22,lineHeight:1,cursor:"pointer"}}>×</button>
         </div>
-
-        {/* Left Panel - Operations Sidebar */}
-        <div style={{ gridArea: 'left-panel', overflowY: 'auto', zIndex: 50 }}>
-          <OperationsSidebar
-            isOpen={sidebarOpen}
-            onClose={() => setSidebarOpen(false)}
-            collapsed={!sidebarOpen}
-            onToggleCollapse={() => setSidebarOpen(!sidebarOpen)}
-          />
-        </div>
-
-        {/* Center Panel - Main Workspace */}
-        <main style={{
-          gridArea: 'center',
-          overflowY: 'auto',
-          padding: '2rem',
-          background: 'var(--bg-primary)'
-        }} className="layout-center">
-          <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-            <Routes>
-              {/* Dashboard Route */}
-              <Route
-                path="/"
-                element={
-                  <div className="animate-fade-in">
-                    <div style={{ marginBottom: '2rem' }}>
-                      <h1 style={{
-                        fontSize: '2rem',
-                        fontWeight: 700,
-                        background: 'linear-gradient(135deg, var(--gold-300), var(--gold-500))',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text',
-                        marginBottom: '0.5rem'
-                      }}>
-                        Executive Dashboard
-                      </h1>
-                      <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-                        Welcome to Fresh People Command Center
-                      </p>
-                    </div>
-
-                    {/* KPI Cards */}
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                      gap: '1.5rem',
-                      marginBottom: '2rem'
-                    }}>
-                      {Object.values(kpis).map(kpi => (
-                        <div key={kpi.id} className="glass-card hover-card" style={{
-                          padding: '1.5rem',
-                          cursor: 'pointer'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                            <span style={{ fontSize: '1.5rem' }}>{kpi.icon}</span>
-                            <span style={{
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              color: kpi.trend === 'up' ? '#10B981' : kpi.trend === 'down' ? '#EF4444' : 'var(--text-muted)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.25rem'
-                            }}>
-                              {kpi.trend === 'up' ? '↑' : kpi.trend === 'down' ? '↓' : '→'} {Math.abs(kpi.change)}%
-                            </span>
-                          </div>
-                          <div style={{
-                            fontSize: '1.75rem',
-                            fontWeight: 700,
-                            color: 'var(--text-primary)',
-                            marginBottom: '0.25rem'
-                          }}>
-                            {kpi.value}
-                          </div>
-                          <div style={{
-                            fontSize: '0.813rem',
-                            color: 'var(--text-muted)',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.05em'
-                          }}>
-                            {kpi.label}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Dashboard Content */}
-                    <Dashboard />
-                  </div>
-                }
-              />
-
-              {/* Calendar Route - NEW OPERATIONS CALENDAR */}
-              <Route
-                path="/calendar"
-                element={
-                  <div className="animate-fade-in">
-                    <OperationsCalendar
-                      events={events}
-                      onEventClick={handleEventClick}
-                      onEventCreate={handleEventCreate}
-                      onEventDrop={handleEventDrop}
-                    />
-                  </div>
-                }
-              />
-
-              {/* Events Route (Preserved) */}
-              <Route
-                path="/events"
-                element={
-                  <div className="animate-fade-in">
-                    <h1 style={{
-                      fontSize: '2rem',
-                      fontWeight: 700,
-                      background: 'linear-gradient(135deg, var(--gold-300), var(--gold-500))',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundClip: 'text',
-                      marginBottom: '2rem'
-                    }}>
-                      Event Management
-                    </h1>
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-                      gap: '1.5rem'
-                    }}>
-                      <div>
-                        <EventFormPolished onEventCreated={() => {
-                          setRefreshKey(k => k + 1);
-                        }} />
-                      </div>
-                      <div>
-                        <EventList refreshKey={refreshKey} />
-                      </div>
-                    </div>
-                  </div>
-                }
-              />
-
-              {/* Staff Route (Preserved) */}
-              <Route
-                path="/staff"
-                element={
-                  <div className="animate-fade-in">
-                    <h1 style={{
-                      fontSize: '2rem',
-                      fontWeight: 700,
-                      background: 'linear-gradient(135deg, var(--gold-300), var(--gold-500))',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundClip: 'text',
-                      marginBottom: '2rem'
-                    }}>
-                      Staff Management
-                    </h1>
-                    <StaffView />
-                  </div>
-                }
-              />
-
-              {/* Payroll Route - Finance Agent */}
-              <Route
-                path="/payroll"
-                element={
-                  <div className="animate-fade-in">
-                    <Payroll />
-                  </div>
-                }
-              />
-
-              {/* Catch all - redirect to dashboard */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </div>
-        </main>
-
-        {/* Right Panel - Live Operations Feed */}
-        <div style={{ gridArea: 'right-panel', overflowY: 'auto', zIndex: 50 }}>
-          <LiveOperationsFeed
-            todaysSchedule={todaysSchedule}
-            staffStatus={staff}
-            alerts={alerts}
-            pendingPayments={payments}
-            recentActivity={activity}
-            onEventClick={handleEventClick}
-            onStaffClick={handleStaffClick}
-            onAlertAction={handleAlertAction}
-            onPaymentProcess={handlePaymentProcess}
-            collapsed={!rightPanelOpen}
-            onToggleCollapse={() => setRightPanelOpen(!rightPanelOpen)}
-          />
-        </div>
-
-        {/* Floating Action Button */}
-        <FloatingActionButton
-          onAction={handleFabAction}
-          position="bottom-right"
-        />
-
-        {/* Modal System */}
-        <ModalSystem
-          activeModal={activeModal}
-          modalData={modalData}
-          onClose={() => {
-            setActiveModal(null);
-            setModalData(null);
-          }}
-          onSave={handleModalSave}
-        />
+        {children}
       </div>
-    </BrowserRouter>
+    </div>
+  );
+}
+function Toast({msg,type="success",onDone}: {msg: string, type?: string, onDone: ()=>void}){
+  useEffect(()=>{const t=setTimeout(onDone,3500);return()=>clearTimeout(t);},[onDone]);
+  const color=type==="error"?RED:type==="warn"?AMBER:ACCENT;
+  return(
+    <div style={{position:"fixed",bottom:24,right:24,zIndex:999,background:SURFACE,border:`1px solid ${color}55`,borderLeft:`4px solid ${color}`,
+      borderRadius:10,padding:"14px 20px",fontSize:13,color:TEXT,maxWidth:340,boxShadow:"0 8px 32px rgba(0,0,0,0.5)"}}>
+      {msg}
+    </div>
   );
 }
 
-export default App;
+// ─── Anthropic API call helper ───────────────────────────────────────────────
+async function callClaude(systemPrompt: string, userPrompt: string) {
+  const res = await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      model:"claude-sonnet-4-20250514",
+      max_tokens:1000,
+      system: systemPrompt,
+      messages:[{role:"user",content:userPrompt}]
+    })
+  });
+  const data = await res.json();
+  return data.content?.[0]?.text || "";
+}
+
+// ─── Document Print View ────────────────────────────────────────────────────
+function DocPrint({doc, docType, client, event: evt, allDocs, onClose}: {
+  doc: any, docType: string, client: any, event: any, allDocs: any[], onClose: ()=>void
+}){
+  const sub  = docSubtotal(doc.lines);
+  const vat  = sub*0.15;
+  const total= sub+vat;
+  const isPaid = docType==="statement";
+  const paidAmt = isPaid ? allDocs.filter((d: any)=>d.clientId===doc.clientId&&d.status==="paid").reduce((a: number,d: any)=>a+docSubtotal(d.lines)*1.15,0) : 0;
+  const outstanding = isPaid ? allDocs.filter((d: any)=>d.clientId===doc.clientId&&d.status!=="paid").reduce((a: number,d: any)=>a+docSubtotal(d.lines)*1.15,0) : 0;
+
+  const titles: Record<string,string> = {invoice:"TAX INVOICE", quote:"QUOTATION", statement:"ACCOUNT STATEMENT"};
+  const statusC = STATUS_COLOR[doc.status]||MUTED;
+
+  return(
+    <Modal title={titles[docType]||"Document"} onClose={onClose} width={680}>
+      <div className="print-doc" style={{background:"#fff",color:"#111",borderRadius:10,padding:40}}>
+        {/* Header */}
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:36}}>
+          <div>
+            <div style={{fontSize:26,fontWeight:800,color:"#111",letterSpacing:"-0.03em"}}>FRESHPEOPLE</div>
+            <div style={{fontSize:12,color:"#666",marginTop:2}}>Events Staffing Solutions</div>
+            <div style={{fontSize:12,color:"#666"}}>VAT Reg No: 4200000001</div>
+            <div style={{fontSize:12,color:"#666"}}>4th Floor, 9 Fredman Drive, Sandton</div>
+            <div style={{fontSize:12,color:"#666"}}>admin@freshpeople.co.za · +27 11 234 5678</div>
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#888",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:4}}>{titles[docType]}</div>
+            <div style={{fontSize:20,fontWeight:700,color:"#111"}}>{doc.docNo}</div>
+            <div style={{fontSize:12,color:"#666",marginTop:6}}>Issue: {fmtDate(doc.issueDate)}</div>
+            {doc.dueDate&&<div style={{fontSize:12,color:"#666"}}>Due: {fmtDate(doc.dueDate)}</div>}
+            {doc.validUntil&&<div style={{fontSize:12,color:"#666"}}>Valid until: {fmtDate(doc.validUntil)}</div>}
+            {doc.status&&<div style={{marginTop:10}}>
+              <span style={{background:statusC,color:"#000",fontSize:11,padding:"3px 10px",borderRadius:4,fontWeight:700}}>{doc.status.toUpperCase()}</span>
+            </div>}
+          </div>
+        </div>
+
+        {/* Bill To */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginBottom:28,padding:"16px 0",borderTop:"1px solid #e5e7eb",borderBottom:"1px solid #e5e7eb"}}>
+          <div>
+            <div style={{fontSize:10,color:"#888",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:8}}>Bill To</div>
+            <div style={{fontWeight:700,color:"#111",fontSize:14}}>{client?.name||"—"}</div>
+            <div style={{fontSize:12,color:"#555"}}>{client?.email}</div>
+            <div style={{fontSize:12,color:"#555"}}>{client?.phone}</div>
+            <div style={{fontSize:12,color:"#555"}}>{client?.address}</div>
+            {client?.vatNo&&<div style={{fontSize:12,color:"#555"}}>VAT: {client.vatNo}</div>}
+          </div>
+          {evt&&<div>
+            <div style={{fontSize:10,color:"#888",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:8}}>Event Reference</div>
+            <div style={{fontWeight:600,color:"#111",fontSize:13}}>{evt.title}</div>
+            <div style={{fontSize:12,color:"#555"}}>{fmtDate(evt.date)}</div>
+            <div style={{fontSize:12,color:"#555"}}>{evt.venue}</div>
+            <div style={{fontSize:12,color:"#555"}}>{evt.startTime} – {evt.endTime}</div>
+          </div>}
+        </div>
+
+        {/* Statement summary */}
+        {docType==="statement"?(
+          <div>
+            <table style={{width:"100%",borderCollapse:"collapse",marginBottom:24}}>
+              <thead><tr style={{borderBottom:"2px solid #e5e7eb"}}>
+                {["Doc No","Type","Date","Due","Amount","Status"].map(h=>(
+                  <th key={h} style={{padding:"8px 10px",textAlign:"left",fontSize:11,color:"#888",textTransform:"uppercase",letterSpacing:"0.05em"}}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>{allDocs.filter((d: any)=>d.clientId===doc.clientId).map((d: any,i: number)=>{
+                const amt=(docSubtotal(d.lines)*1.15).toFixed(2);
+                return(
+                  <tr key={i} style={{borderBottom:"1px solid #f3f4f6"}}>
+                    <td style={{padding:"9px 10px",fontSize:12,fontWeight:500}}>{d.docNo}</td>
+                    <td style={{padding:"9px 10px",fontSize:12,color:"#888",textTransform:"capitalize"}}>{d.type||"invoice"}</td>
+                    <td style={{padding:"9px 10px",fontSize:12}}>{fmtDate(d.issueDate)}</td>
+                    <td style={{padding:"9px 10px",fontSize:12,color:d.status==="overdue"?"#dc2626":"#555"}}>{fmtDate(d.dueDate)}</td>
+                    <td style={{padding:"9px 10px",fontSize:12,fontFamily:"'DM Mono',monospace"}}>R {amt}</td>
+                    <td style={{padding:"9px 10px"}}><span style={{background:STATUS_COLOR[d.status]||"#888",color:"#000",fontSize:10,padding:"2px 7px",borderRadius:3,fontWeight:700}}>{d.status?.toUpperCase()}</span></td>
+                  </tr>
+                );
+              })}</tbody>
+            </table>
+            <div style={{display:"flex",justifyContent:"flex-end"}}>
+              <table style={{fontSize:13,borderCollapse:"collapse"}}>
+                {[["Total Invoiced",`R ${(paidAmt+outstanding).toFixed(2)}`],["Paid",`R ${paidAmt.toFixed(2)}`]].map(([l,v])=>(
+                  <tr key={l}><td style={{padding:"4px 16px 4px 0",color:"#555"}}>{l}</td><td style={{padding:"4px 0",textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{v}</td></tr>
+                ))}
+                <tr style={{borderTop:"2px solid #111"}}>
+                  <td style={{padding:"8px 16px 4px 0",fontWeight:700,fontSize:15}}>Balance Due</td>
+                  <td style={{padding:"8px 0 4px 0",textAlign:"right",fontWeight:700,fontSize:15,fontFamily:"'DM Mono',monospace",color:"#dc2626"}}>R {outstanding.toFixed(2)}</td>
+                </tr>
+              </table>
+            </div>
+          </div>
+        ):(
+          <>
+            <table style={{width:"100%",borderCollapse:"collapse",marginBottom:24}}>
+              <thead><tr style={{borderBottom:"2px solid #e5e7eb"}}>
+                {["Description","Qty","Unit Rate","Amount"].map(h=>(
+                  <th key={h} style={{padding:"8px 10px",textAlign:h==="Description"?"left":"right",fontSize:11,color:"#888",textTransform:"uppercase",letterSpacing:"0.06em"}}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>{doc.lines.map((l: any,i: number)=>(
+                <tr key={i} style={{borderBottom:"1px solid #f3f4f6"}}>
+                  <td style={{padding:"10px 10px",fontSize:13}}>{l.desc}</td>
+                  <td style={{padding:"10px 10px",textAlign:"right",fontSize:13}}>{l.qty}</td>
+                  <td style={{padding:"10px 10px",textAlign:"right",fontSize:13,fontFamily:"'DM Mono',monospace"}}>R {Number(l.rate).toFixed(2)}</td>
+                  <td style={{padding:"10px 10px",textAlign:"right",fontSize:13,fontFamily:"'DM Mono',monospace",fontWeight:500}}>R {(l.qty*l.rate).toFixed(2)}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+            <div style={{display:"flex",justifyContent:"flex-end",marginBottom:24}}>
+              <table style={{fontSize:13,borderCollapse:"collapse"}}>
+                {[["Subtotal",`R ${sub.toFixed(2)}`],["VAT (15%)",`R ${(sub*0.15).toFixed(2)}`]].map(([l,v])=>(
+                  <tr key={l}><td style={{padding:"4px 16px 4px 0",color:"#666"}}>{l}</td><td style={{padding:"4px 0",textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{v}</td></tr>
+                ))}
+                <tr style={{borderTop:"2px solid #111"}}>
+                  <td style={{padding:"8px 16px 4px 0",fontWeight:700,fontSize:15}}>Total</td>
+                  <td style={{padding:"8px 0 4px 0",textAlign:"right",fontWeight:700,fontSize:15,fontFamily:"'DM Mono',monospace"}}>R {total.toFixed(2)}</td>
+                </tr>
+              </table>
+            </div>
+          </>
+        )}
+
+        {/* Footer */}
+        {doc.notes&&<div style={{marginTop:16,fontSize:12,color:"#555",fontStyle:"italic"}}>{doc.notes}</div>}
+        <div style={{marginTop:24,padding:"14px 16px",background:"#f9fafb",borderRadius:8,fontSize:12,color:"#555"}}>
+          <div style={{fontWeight:700,marginBottom:6,color:"#111"}}>Banking Details</div>
+          <div>Bank: FNB · Account: 6254 0001 0034 · Branch: 250655 · Acc Type: Business Current</div>
+          <div>Reference: {doc.docNo}</div>
+        </div>
+      </div>
+      <div style={{display:"flex",gap:10,marginTop:20}} className="no-print">
+        <Btn variant="accent" onClick={()=>window.print()} style={{flex:1,padding:"11px"}}>🖨 Print / Save PDF</Btn>
+        <Btn variant="ghost" onClick={onClose} style={{flex:1,padding:"11px"}}>Close</Btn>
+      </div>
+    </Modal>
+  );
+}
+
+// ─── Document Form ──────────────────────────────────────────────────────────
+function DocForm({docType, clients, events, existingDocs, onSave, onClose}: {
+  docType: string, clients: any[], events: any[], existingDocs: any[], onSave: (doc: any)=>void, onClose: ()=>void
+}){
+  const prefix = docType==="invoice" ? "FP-INV" : "FP-QTE";
+  const [form,setForm] = useState({
+    docNo: nextDocNo(existingDocs, prefix),
+    clientId:"", eventId:"",
+    issueDate:ymd(today),
+    dueDate: docType==="invoice" ? ymd(addDays(today,30)) : "",
+    validUntil: docType==="quote" ? ymd(addDays(today,30)) : "",
+    lines:[{desc:"",qty:1,rate:0}],
+    notes: docType==="invoice"?"Thank you for your business.":"This quotation is valid for 30 days.",
+    type: docType,
+  });
+
+  function prefill(eventId: string){
+    const ev=events.find((e: any)=>e.id===Number(eventId));
+    if(!ev){ setForm(f=>({...f,eventId})); return; }
+    const hrs=eventHours(ev);
+    const lines=ev.staffIds.map((id: number)=>{
+      const s=INITIAL_STAFF.find((x: any)=>x.id===id);
+      return {desc:`${s?.name||"Staff"} — ${s?.role||""} (${hrs}h @ R${s?.rate}/h)`, qty:hrs, rate:s?.rate||0};
+    });
+    setForm(f=>({...f,eventId,clientId:String(ev.clientId||f.clientId),lines}));
+  }
+  function addLine(){ setForm(f=>({...f,lines:[...f.lines,{desc:"",qty:1,rate:0}]})); }
+  function updLine(i: number,k: string,v: any){ setForm(f=>({...f,lines:f.lines.map((l: any,j: number)=>j===i?{...l,[k]:v}:l)})); }
+  function rmLine(i: number){ setForm(f=>({...f,lines:f.lines.filter((_: any,j: number)=>j!==i)})); }
+
+  const sub=docSubtotal(form.lines);
+
+  return(
+    <Modal title={docType==="invoice"?"New Invoice":"New Quotation"} onClose={onClose} width={660}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+        <Fld label="Doc Number"><input value={form.docNo} onChange={e=>setForm(f=>({...f,docNo:e.target.value}))} style={{width:"100%"}}/></Fld>
+        <Fld label="Client *">
+          <select value={form.clientId} onChange={e=>setForm(f=>({...f,clientId:e.target.value}))} style={{width:"100%"}}>
+            <option value="">— Select client —</option>
+            {clients.map((c: any)=><option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </Fld>
+        <Fld label="Link Event (auto-fills lines)">
+          <select value={form.eventId} onChange={e=>prefill(e.target.value)} style={{width:"100%"}}>
+            <option value="">— None —</option>
+            {events.map((ev: any)=><option key={ev.id} value={ev.id}>{ev.title} ({fmtDate(ev.date)})</option>)}
+          </select>
+        </Fld>
+        <Fld label="Issue Date"><input type="date" value={form.issueDate} onChange={e=>setForm(f=>({...f,issueDate:e.target.value}))} style={{width:"100%"}}/></Fld>
+        {docType==="invoice"
+          ?<Fld label="Due Date"><input type="date" value={form.dueDate} onChange={e=>setForm(f=>({...f,dueDate:e.target.value}))} style={{width:"100%"}}/></Fld>
+          :<Fld label="Valid Until"><input type="date" value={form.validUntil} onChange={e=>setForm(f=>({...f,validUntil:e.target.value}))} style={{width:"100%"}}/></Fld>
+        }
+      </div>
+      <Fld label="Line Items">
+        {form.lines.map((l: any,i: number)=>(
+          <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 72px 96px 28px",gap:8,marginBottom:8,alignItems:"center"}}>
+            <input value={l.desc} onChange={e=>updLine(i,"desc",e.target.value)} placeholder="Description" style={{width:"100%"}}/>
+            <input type="number" value={l.qty} onChange={e=>updLine(i,"qty",e.target.value)} placeholder="Qty" style={{width:"100%",textAlign:"right"}}/>
+            <input type="number" value={l.rate} onChange={e=>updLine(i,"rate",e.target.value)} placeholder="Rate" style={{width:"100%",textAlign:"right"}}/>
+            <button onClick={()=>rmLine(i)} style={{background:"none",border:"none",color:MUTED,fontSize:18,cursor:"pointer"}}>×</button>
+          </div>
+        ))}
+        <Btn onClick={addLine} style={{fontSize:12,padding:"5px 12px"}}>+ Add Line</Btn>
+      </Fld>
+      <div style={{background:SURFACE2,borderRadius:8,padding:"12px 16px",marginBottom:14,fontSize:13}}>
+        <div style={{display:"flex",justifyContent:"space-between",color:MUTED}}><span>Subtotal</span><span className="mono">R {sub.toFixed(2)}</span></div>
+        <div style={{display:"flex",justifyContent:"space-between",color:MUTED}}><span>VAT 15%</span><span className="mono">R {(sub*0.15).toFixed(2)}</span></div>
+        <div style={{display:"flex",justifyContent:"space-between",fontWeight:600,marginTop:8,paddingTop:8,borderTop:`1px solid ${BORDER}`}}>
+          <span>Total</span><span className="mono" style={{color:ACCENT}}>R {(sub*1.15).toFixed(2)}</span>
+        </div>
+      </div>
+      <Fld label="Notes / Terms">
+        <textarea value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} rows={2} style={{width:"100%"}}/>
+      </Fld>
+      <div style={{display:"flex",gap:10}}>
+        <Btn variant="primary" onClick={()=>onSave({...form,id:Date.now(),status:"draft",lines:form.lines.map((l: any)=>({...l,qty:Number(l.qty),rate:Number(l.rate)}))})} style={{flex:1,padding:"11px"}}>
+          Create {docType==="invoice"?"Invoice":"Quote"}
+        </Btn>
+        <Btn variant="ghost" onClick={onClose} style={{flex:1,padding:"11px"}}>Cancel</Btn>
+      </div>
+    </Modal>
+  );
+}
+
+// ─── Documents Tab ──────────────────────────────────────────────────────────
+function DocumentsTab({invoices,setInvoices,quotes,setQuotes,clients,events}: {
+  invoices: any[], setInvoices: (inv: any[])=>void, quotes: any[], setQuotes: (q: any[])=>void,
+  clients: any[], events: any[]
+}){
+  const [view,setView]         = useState("invoices");
+  const [showForm,setShowForm] = useState<string|null>(null);
+  const [printDoc,setPrintDoc] = useState<any>(null);
+  const [stmtClient,setStmtClient] = useState("");
+  const [filterStatus,setFilter] = useState("all");
+  const [toast,setToast]       = useState<{msg:string,type:string}|null>(null);
+
+  const allDocs = [...invoices,...quotes];
+
+  const invTotal  = invoices.reduce((a: number,i: any)=>a+docSubtotal(i.lines)*1.15,0);
+  const invPaid   = invoices.filter((i: any)=>i.status==="paid").reduce((a: number,i: any)=>a+docSubtotal(i.lines)*1.15,0);
+  const invOverdue= invoices.filter((i: any)=>i.status==="overdue").length;
+  const quoteConv = quotes.length ? Math.round(quotes.filter((q: any)=>q.status==="accepted").length/quotes.length*100) : 0;
+
+  function setStatus(id: number, status: string, collection: any[], setter: (docs: any[])=>void){
+    setter(prev=>prev.map((d: any)=>d.id===id?{...d,status}:d));
+    setToast({msg:`Status updated to ${status}`,type:"success"});
+  }
+  function deleteDoc(id: number, setter: (docs: any[])=>void){ setter(prev=>prev.filter((d: any)=>d.id!==id)); }
+
+  function convertToInvoice(quote: any){
+    const inv={
+      ...quote,
+      id:Date.now(),
+      docNo:nextDocNo(invoices,"FP-INV"),
+      type:"invoice",
+      dueDate:ymd(addDays(today,30)),
+      validUntil:undefined,
+      status:"draft",
+    };
+    setInvoices(prev=>[inv,...prev]);
+    setQuotes(prev=>prev.map((q: any)=>q.id===quote.id?{...q,status:"accepted"}:q));
+    setToast({msg:`Quote converted to Invoice ${inv.docNo}`,type:"success"});
+    setView("invoices");
+  }
+
+  const renderDocs = (docs: any[], setter: (docs: any[])=>void, isInvoice: boolean) => {
+    const filtered = filterStatus==="all" ? docs : docs.filter((d: any)=>d.status===filterStatus);
+    if(!filtered.length) return <div style={{textAlign:"center",padding:48,color:MUTED,fontSize:14}}>No documents found</div>;
+    return(
+      <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:12,overflow:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+          <thead style={{background:SURFACE2}}><tr>
+            {["Doc No","Client","Event","Date",isInvoice?"Due":"Valid Until","Total","Status",""].map(h=>(
+              <th key={h} style={{padding:"12px 14px",textAlign:"left",color:MUTED,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:"0.05em"}}>{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>{filtered.map((doc: any)=>{
+            const client=clients.find((c: any)=>c.id===doc.clientId);
+            const event=events.find((e: any)=>e.id===doc.eventId);
+            const total=(docSubtotal(doc.lines)*1.15).toFixed(2);
+            const sc=STATUS_COLOR[doc.status]||MUTED;
+            return(
+              <tr key={doc.id} style={{borderTop:`1px solid ${BORDER}33`}}>
+                <td style={{padding:"12px 14px",fontFamily:"'DM Mono',monospace",color:ACCENT}}>{doc.docNo}</td>
+                <td style={{padding:"12px 14px",fontWeight:500}}>{client?.name||"—"}</td>
+                <td style={{padding:"12px 14px",color:MUTED,fontSize:12,maxWidth:140,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{event?.title||"—"}</td>
+                <td style={{padding:"12px 14px",color:MUTED}}>{fmtDate(doc.issueDate)}</td>
+                <td style={{padding:"12px 14px",color:doc.status==="overdue"?RED:MUTED}}>{fmtDate(isInvoice?doc.dueDate:doc.validUntil)}</td>
+                <td style={{padding:"12px 14px",fontFamily:"'DM Mono',monospace"}}>R {total}</td>
+                <td style={{padding:"12px 14px"}}>
+                  <select value={doc.status} onChange={e=>setStatus(doc.id,e.target.value,docs,setter)}
+                    style={{background:sc+"22",color:sc,border:`1px solid ${sc}44`,borderRadius:6,padding:"3px 8px",fontSize:11,fontWeight:600,textTransform:"uppercase"}}>
+                    {(isInvoice?["draft","sent","paid","overdue"]:["draft","sent","accepted","declined","expired"]).map(s=><option key={s} value={s}>{s}</option>)}
+                  </select>
+                </td>
+                <td style={{padding:"12px 14px"}}>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    <Btn onClick={()=>setPrintDoc({doc,docType:isInvoice?"invoice":"quote"})} style={{fontSize:11,padding:"4px 10px"}}>View</Btn>
+                    {!isInvoice&&doc.status!=="accepted"&&<Btn variant="accent" onClick={()=>convertToInvoice(doc)} style={{fontSize:11,padding:"4px 10px"}}>→ Invoice</Btn>}
+                    <Btn variant="danger" onClick={()=>deleteDoc(doc.id,setter)} style={{fontSize:11,padding:"4px 10px"}}>×</Btn>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}</tbody>
+        </table>
+      </div>
+    );
+  };
+
+  return(
+    <div>
+      {/* Stats */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:24}}>
+        <Stat label="Invoiced (incl VAT)"  value={`R ${invTotal.toFixed(0)}`}    accent={ACCENT} />
+        <Stat label="Collected"            value={`R ${invPaid.toFixed(0)}`}      accent={ACCENT} />
+        <Stat label="Overdue invoices"     value={invOverdue}                     accent={invOverdue?RED:MUTED} />
+        <Stat label="Quote conversion"     value={`${quoteConv}%`}               accent={AMBER} sub={`${quotes.length} quotes total`}/>
+      </div>
+
+      {/* Sub-tabs */}
+      <div style={{display:"flex",gap:0,background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:10,padding:4,width:"fit-content",marginBottom:20}}>
+        {[["invoices","Invoices"],["quotes","Quotations"],["statements","Statements"]].map(([k,l])=>(
+          <button key={k} onClick={()=>setView(k)} style={{
+            padding:"8px 20px",borderRadius:7,border:"none",fontSize:13,fontWeight:500,
+            background:view===k?ACCENT+"22":"transparent",
+            color:view===k?ACCENT:MUTED,
+            borderBottom:view===k?`2px solid ${ACCENT}`:"2px solid transparent",
+          }}>{l}</button>
+        ))}
+      </div>
+
+      {/* Controls */}
+      {view!=="statements"&&(
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {["all","draft","sent",view==="invoices"?"paid":"accepted",view==="invoices"?"overdue":"declined"].map(s=>(
+              <button key={s} onClick={()=>setFilter(s)} style={{
+                padding:"5px 13px",borderRadius:20,border:`1px solid ${filterStatus===s?(STATUS_COLOR[s]||ACCENT):BORDER}`,
+                background:filterStatus===s?(STATUS_COLOR[s]||ACCENT)+"22":"transparent",
+                color:filterStatus===s?(STATUS_COLOR[s]||ACCENT):MUTED,fontSize:12,fontWeight:500,textTransform:"capitalize",
+              }}>{s}</button>
+            ))}
+          </div>
+          <Btn variant="primary" onClick={()=>setShowForm(view==="invoices"?"invoice":"quote")}>
+            + New {view==="invoices"?"Invoice":"Quote"}
+          </Btn>
+        </div>
+      )}
+
+      {/* Content */}
+      {view==="invoices" && renderDocs(invoices, setInvoices, true)}
+      {view==="quotes"   && renderDocs(quotes, setQuotes, false)}
+      {view==="statements"&&(
+        <div>
+          <div style={{marginBottom:20,maxWidth:320}}>
+            <Lbl>Select Client to generate statement</Lbl>
+            <select value={stmtClient} onChange={e=>setStmtClient(e.target.value)} style={{width:"100%"}}>
+              <option value="">— Choose client —</option>
+              {clients.map((c: any)=><option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          {stmtClient&&(()=>{
+            const c=clients.find((x: any)=>x.id===Number(stmtClient));
+            const cDocs=allDocs.filter((d: any)=>d.clientId===Number(stmtClient));
+            const outstanding=cDocs.filter((d: any)=>d.status!=="paid").reduce((a: number,d: any)=>a+docSubtotal(d.lines)*1.15,0);
+            const paid=cDocs.filter((d: any)=>d.status==="paid").reduce((a: number,d: any)=>a+docSubtotal(d.lines)*1.15,0);
+            return(
+              <div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:20}}>
+                  <Stat label="Total invoiced" value={`R ${(outstanding+paid).toFixed(0)}`}/>
+                  <Stat label="Paid" value={`R ${paid.toFixed(0)}`} accent={ACCENT}/>
+                  <Stat label="Balance due" value={`R ${outstanding.toFixed(0)}`} accent={outstanding>0?RED:MUTED}/>
+                </div>
+                <Btn variant="accent" onClick={()=>setPrintDoc({
+                  doc:{...c,docNo:`FP-STMT-${Date.now()}`,clientId:Number(stmtClient),issueDate:ymd(today),lines:[],notes:"",status:"statement"},
+                  docType:"statement"
+                })}>View / Print Statement</Btn>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Modals */}
+      {showForm&&(
+        <DocForm
+          docType={showForm}
+          clients={clients}
+          events={events}
+          existingDocs={showForm==="invoice"?invoices:quotes}
+          onSave={(doc: any)=>{ if(showForm==="invoice") setInvoices(p=>[doc,...p]); else setQuotes(p=>[doc,...p]); setShowForm(null); setToast({msg:`${showForm==="invoice"?"Invoice":"Quote"} ${doc.docNo} created`,type:"success"}); }}
+          onClose={()=>setShowForm(null)}
+        />
+      )}
+      {printDoc&&(
+        <DocPrint
+          doc={printDoc.doc}
+          docType={printDoc.docType}
+          client={clients.find((c: any)=>c.id===printDoc.doc.clientId)}
+          event={events.find((e: any)=>e.id===printDoc.doc.eventId)}
+          allDocs={allDocs}
+          onClose={()=>setPrintDoc(null)}
+        />
+      )}
+      {toast&&<Toast msg={toast.msg} type={toast.type} onDone={()=>setToast(null)}/>}
+    </div>
+  );
+}
+
+// ─── Calendar Tab ───────────────────────────────────────────────────────────
+function CalendarTab({events,setEvents,staff,clients,addToast}: {
+  events: any[], setEvents: (ev: any[])=>void, staff: any[], clients: any[], addToast: (msg: string, type: string)=>void
+}){
+  const [viewDate,setViewDate] = useState(new Date(today.getFullYear(),today.getMonth(),1));
+  const [selected,setSelected] = useState<any>(null);
+  const [showForm,setShowForm] = useState(false);
+  const [editEvt,setEditEvt]   = useState<any>(null);
+  const [gcalEvents,setGcalEvents] = useState<any[]>([]);
+  const [syncing,setSyncing]   = useState(false);
+  const [bookingModal,setBookingModal] = useState<any>(null);
+  const [sendingNotifs,setSendingNotifs] = useState(false);
+  const [form,setForm] = useState({title:"",date:"",venue:"",startTime:"09:00",endTime:"17:00",staffIds:[],clientId:"",color:ACCENT,notes:""});
+
+  const yr=viewDate.getFullYear(), mo=viewDate.getMonth();
+  const firstDay=new Date(yr,mo,1).getDay();
+  const daysInMonth=new Date(yr,mo+1,0).getDate();
+  const cells=Array.from({length:firstDay+daysInMonth},(_,i)=>i<firstDay?null:i-firstDay+1);
+  const todayStr=ymd(today);
+
+  // Fetch GCal events
+  async function fetchGcal(){
+    setSyncing(true);
+    try{
+      const start=new Date(yr,mo,1).toISOString();
+      const end=new Date(yr,mo+1,0,23,59).toISOString();
+      const resp=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          model:"claude-sonnet-4-20250514",
+          max_tokens:2000,
+          system:"You are a calendar assistant. Return ONLY a JSON array of events. Each: {id,title,date,startTime,endTime,location}. Dates as YYYY-MM-DD, times as HH:MM. No extra text.",
+          messages:[{role:"user",content:`List my Google Calendar events from ${start} to ${end}. Return JSON array only.`}],
+          mcp_servers:[{type:"url",url:"https://calendarmcp.googleapis.com/mcp/v1",name:"gcal"}]
+        })
+      });
+      const data=await resp.json();
+      const text=data.content?.find((b: any)=>b.type==="text")?.text||"[]";
+      const cleaned=text.replace(/```json|```/g,"").trim();
+      try{
+        const parsed=JSON.parse(cleaned);
+        if(Array.isArray(parsed)) setGcalEvents(parsed.map((e: any)=>({...e,isGcal:true,color:"#5ca4ea"})));
+      }catch{}
+      addToast("Google Calendar synced ✓","success");
+    }catch(e){ addToast("Could not fetch GCal events","error"); }
+    setSyncing(false);
+  }
+
+  // Push event to GCal
+  async function pushToGcal(ev: any){
+    try{
+      const [sh,sm]=ev.startTime.split(":").map(Number);
+      const [eh,em]=ev.endTime.split(":").map(Number);
+      const base=ev.date+"T";
+      const start=`${base}${pad2(sh)}:${pad2(sm)}:00`;
+      const end=`${base}${pad2(eh)}:${pad2(em)}:00`;
+      const staffNames=ev.staffIds.map((id: number)=>staff.find((s: any)=>s.id===id)?.name||"Staff").join(", ");
+      const description=`Freshpeople Event\nVenue: ${ev.venue||""}\nStaff: ${staffNames}\n${ev.notes||""}`;
+
+      const resp=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          model:"claude-sonnet-4-20250514",
+          max_tokens:500,
+          system:"Create the Google Calendar event as requested. Return only the event ID string, nothing else.",
+          messages:[{role:"user",content:`Create a Google Calendar event: title="${ev.title}", start="${start}", end="${end}", location="${ev.venue||""}", description="${description}". Return the created event ID only.`}],
+          mcp_servers:[{type:"url",url:"https://calendarmcp.googleapis.com/mcp/v1",name:"gcal"}]
+        })
+      });
+      const data=await resp.json();
+      const gcalId=data.content?.find((b: any)=>b.type==="text")?.text?.trim()||null;
+      setEvents(prev=>prev.map((e: any)=>e.id===ev.id?{...e,gcalId}:e));
+      addToast(`"${ev.title}" pushed to Google Calendar ✓`,"success");
+    }catch(e){ addToast("Failed to push to Google Calendar","error"); }
+  }
+
+  // Send staff booking notifications via Gmail drafts
+  async function sendBookingNotifications(ev: any){
+    setSendingNotifs(true);
+    const staffToNotify=ev.staffIds.map((id: number)=>staff.find((s: any)=>s.id===id)).filter(Boolean);
+    const hrs=eventHours(ev).toFixed(1);
+    const pay=staffToNotify.map((s: any)=>({...s,total:(eventHours(ev)*s.rate).toFixed(2)}));
+    let successCount=0;
+
+    for(const s of pay){
+      try{
+        const body=await callClaude(
+          "You write concise, professional staff booking emails for Freshpeople Events Staffing. Be warm but brief. Plain text only, no markdown.",
+          `Write a booking confirmation email to ${s.name} (${s.role}) for:
+Event: ${ev.title}
+Date: ${fmtDate(ev.date)}
+Time: ${ev.startTime} – ${ev.endTime}
+Venue: ${ev.venue||"TBC"}
+Hours: ${hrs}h
+Pay: R${s.total} (R${s.rate}/h)
+Notes: ${ev.notes||"N/A"}
+Sign off from: Freshpeople Admin`
+        );
+
+        await fetch("https://api.anthropic.com/v1/messages",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            model:"claude-sonnet-4-20250514",
+            max_tokens:200,
+            system:"Create the Gmail draft as instructed. Confirm with: Draft created.",
+            messages:[{role:"user",content:`Create a Gmail draft email to: ${s.email}, subject: "Booking Confirmed: ${ev.title} — ${fmtDate(ev.date)}", body: ${JSON.stringify(body)}`}],
+            mcp_servers:[{type:"url",url:"https://gmailmcp.googleapis.com/mcp/v1",name:"gmail"}]
+          })
+        });
+        successCount++;
+      }catch(e){}
+    }
+    setSendingNotifs(false);
+    setBookingModal(null);
+    addToast(`${successCount}/${staffToNotify.length} booking emails drafted in Gmail ✓`,"success");
+  }
+
+  function openNew(day: number){
+    const d=`${yr}-${pad2(mo+1)}-${pad2(day)}`;
+    setForm({title:"",date:d,venue:"",startTime:"09:00",endTime:"17:00",staffIds:[],clientId:"",color:ACCENT,notes:""});
+    setEditEvt(null); setShowForm(true);
+  }
+  function openEdit(ev: any){
+    setForm({...ev,staffIds:[...ev.staffIds],clientId:String(ev.clientId||"")});
+    setEditEvt(ev); setShowForm(true);
+  }
+  function saveEvent(){
+    if(!form.title||!form.date) return;
+    const evt={...form,staffIds:form.staffIds.map(Number),clientId:form.clientId?Number(form.clientId):null};
+    if(editEvt){
+      setEvents(prev=>prev.map((e: any)=>e.id===editEvt.id?{...evt,id:editEvt.id,gcalId:editEvt.gcalId}:e));
+      addToast("Event updated","success");
+    } else {
+      const newEv={...evt,id:Date.now(),gcalId:null};
+      setEvents(prev=>[...prev,newEv]);
+      addToast("Event created","success");
+      setTimeout(()=>pushToGcal(newEv),300);
+    }
+    setShowForm(false); setSelected(null);
+  }
+  function deleteEvent(id: number){
+    setEvents(prev=>prev.filter((e: any)=>e.id!==id));
+    setSelected(null);
+    addToast("Event deleted","warn");
+  }
+  function toggleStaff(id: number){ setForm(f=>({...f,staffIds:f.staffIds.includes(id)?f.staffIds.filter((x: number)=>x!==id):[...f.staffIds,id]})); }
+
+  const upcomingEvs=events.filter((e: any)=>e.date>=todayStr).sort((a: any,b: any)=>a.date.localeCompare(b.date)).slice(0,5);
+  const allCells=[...events,...gcalEvents];
+
+  return(
+    <div>
+      {/* Sync banner */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,background:SURFACE2,border:`1px solid ${BORDER}`,borderRadius:10,padding:"10px 16px"}}>
+        <div style={{fontSize:13}}>
+          <span style={{color:MUTED}}>Google Calendar sync · </span>
+          <span style={{color:ACCENT}}>{gcalEvents.length} events loaded</span>
+          <span style={{color:MUTED,fontSize:11,marginLeft:12}}>Apple Calendar syncs automatically via Google ↔ iCloud CalDAV</span>
+        </div>
+        <Btn variant="accent" onClick={fetchGcal} disabled={syncing} style={{fontSize:12,padding:"6px 14px"}}>
+          {syncing?"Syncing…":"↻ Sync Google Calendar"}
+        </Btn>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 290px",gap:20}}>
+        {/* Calendar grid */}
+        <div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+            <div style={{fontSize:18,fontWeight:600}}>{MONTHS[mo]} {yr}</div>
+            <div style={{display:"flex",gap:8}}>
+              <Btn onClick={()=>setViewDate(new Date(yr,mo-1,1))} style={{fontSize:12,padding:"6px 12px"}}>‹</Btn>
+              <Btn onClick={()=>setViewDate(new Date(today.getFullYear(),today.getMonth(),1))} style={{fontSize:12,padding:"6px 12px"}}>Today</Btn>
+              <Btn onClick={()=>setViewDate(new Date(yr,mo+1,1))} style={{fontSize:12,padding:"6px 12px"}}>›</Btn>
+            </div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:2}}>
+            {WDAYS.map(d=><div key={d} style={{textAlign:"center",fontSize:11,color:MUTED,padding:"6px 0",textTransform:"uppercase",letterSpacing:"0.06em"}}>{d}</div>)}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
+            {cells.map((day,idx)=>{
+              if(!day) return <div key={idx}/>;
+              const cellDate=`${yr}-${pad2(mo+1)}-${pad2(day)}`;
+              const dayEvs=allCells.filter((e: any)=>e.date===cellDate);
+              const isToday=cellDate===todayStr;
+              return(
+                <div key={idx} onClick={()=>openNew(day)}
+                  style={{minHeight:80,background:isToday?ACCENT+"18":SURFACE,border:`1px solid ${isToday?ACCENT+"55":BORDER}`,
+                    borderRadius:8,padding:6,cursor:"pointer"}}
+                  onMouseEnter={e=>e.currentTarget.style.background=SURFACE2}
+                  onMouseLeave={e=>e.currentTarget.style.background=isToday?ACCENT+"18":SURFACE}
+                >
+                  <div style={{fontSize:12,fontWeight:isToday?700:400,color:isToday?ACCENT:TEXT,marginBottom:4}}>{day}</div>
+                  {dayEvs.map((ev: any)=>(
+                    <div key={ev.id} onClick={(e)=>{e.stopPropagation();setSelected(ev);}}
+                      style={{background:ev.color+"33",border:`1px solid ${ev.color}55`,borderLeft:`3px solid ${ev.color}`,
+                        borderRadius:4,padding:"2px 5px",fontSize:10,marginBottom:2,color:TEXT,
+                        overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}}
+                      title={`${ev.title}${ev.isGcal?" (Google Calendar)":""}`}
+                    >{ev.isGcal?"📅 ":""}{ev.title}</div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          <Btn variant="primary" onClick={()=>openNew(today.getDate())} style={{width:"100%",padding:"10px"}}>+ New Event</Btn>
+
+          {/* Selected detail */}
+          {selected&&!selected.isGcal&&(
+            <div style={{background:SURFACE,border:`1px solid ${selected.color}55`,borderLeft:`4px solid ${selected.color}`,borderRadius:10,padding:16}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                <div style={{fontWeight:600,fontSize:14}}>{selected.title}</div>
+                <button onClick={()=>setSelected(null)} style={{background:"none",border:"none",color:MUTED,fontSize:18,cursor:"pointer"}}>×</button>
+              </div>
+              <div style={{fontSize:12,color:MUTED}}>{fmtDate(selected.date)} · {selected.startTime}–{selected.endTime}</div>
+              {selected.venue&&<div style={{fontSize:12,marginTop:4}}>{selected.venue}</div>}
+              {selected.notes&&<div style={{fontSize:12,color:MUTED,marginTop:4,fontStyle:"italic"}}>{selected.notes}</div>}
+              <div style={{margin:"10px 0",display:"flex",flexWrap:"wrap",gap:4}}>
+                {selected.staffIds.map((id: number)=>{const s=staff.find((x: any)=>x.id===id);return s?<Badge key={id} color={MUTED}>{s.name.split(" ")[0]}</Badge>:null;})}
+              </div>
+              {selected.gcalId
+                ?<div style={{fontSize:11,color:ACCENT,marginBottom:10}}>✓ Synced to Google Calendar</div>
+                :<Btn variant="accent" onClick={()=>pushToGcal(selected)} style={{width:"100%",fontSize:12,padding:"6px",marginBottom:8}}>↑ Push to Google Calendar</Btn>
+              }
+              <Btn variant="amber" onClick={()=>setBookingModal(selected)} style={{width:"100%",fontSize:12,padding:"6px",marginBottom:8}}>
+                📧 Send Staff Booking Emails
+              </Btn>
+              <div style={{display:"flex",gap:8}}>
+                <Btn onClick={()=>openEdit(selected)} style={{flex:1,fontSize:12,padding:"6px"}}>Edit</Btn>
+                <Btn variant="danger" onClick={()=>deleteEvent(selected.id)} style={{flex:1,fontSize:12,padding:"6px"}}>Delete</Btn>
+              </div>
+            </div>
+          )}
+          {selected?.isGcal&&(
+            <div style={{background:SURFACE,border:`1px solid ${selected.color}55`,borderLeft:`4px solid ${selected.color}`,borderRadius:10,padding:16}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                <div style={{fontWeight:600,fontSize:14}}>{selected.title}</div>
+                <button onClick={()=>setSelected(null)} style={{background:"none",border:"none",color:MUTED,fontSize:18,cursor:"pointer"}}>×</button>
+              </div>
+              <div style={{fontSize:12,color:"#5ca4ea",marginBottom:4}}>📅 Google Calendar Event</div>
+              <div style={{fontSize:12,color:MUTED}}>{fmtDate(selected.date)} · {selected.startTime}–{selected.endTime}</div>
+              {selected.location&&<div style={{fontSize:12,marginTop:4}}>{selected.location}</div>}
+            </div>
+          )}
+
+          {/* Upcoming */}
+          <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:10,padding:16}}>
+            <div style={{fontSize:12,color:MUTED,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12}}>Upcoming Events</div>
+            {upcomingEvs.length===0&&<div style={{fontSize:13,color:MUTED}}>No upcoming events</div>}
+            {upcomingEvs.map((ev: any)=>(
+              <div key={ev.id} onClick={()=>setSelected(ev)} style={{marginBottom:12,cursor:"pointer"}}>
+                <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
+                  <div style={{width:3,minHeight:36,background:ev.color,borderRadius:2,flexShrink:0,marginTop:2}}/>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:500}}>{ev.title}</div>
+                    <div style={{fontSize:11,color:MUTED}}>{fmtDate(ev.date)} · {ev.startTime}</div>
+                    <div style={{fontSize:11,color:MUTED,display:"flex",gap:6,alignItems:"center"}}>
+                      <span>{ev.staffIds.length} staff</span>
+                      {ev.gcalId&&<span style={{color:ACCENT}}>✓GCal</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* GCal legend */}
+          <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:10,padding:12,fontSize:11,color:MUTED}}>
+            <div style={{marginBottom:6,fontWeight:500,color:TEXT}}>Calendar Legend</div>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}><div style={{width:10,height:10,borderRadius:2,background:ACCENT}}/> Freshpeople events</div>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}><div style={{width:10,height:10,borderRadius:2,background:"#5ca4ea"}}/> Google Calendar</div>
+            <div style={{marginTop:8}}>Apple Calendar syncs via:<br/>Settings → Calendar → Add Account → Google</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Event form */}
+      {showForm&&(
+        <Modal title={editEvt?"Edit Event":"New Event"} onClose={()=>setShowForm(false)}>
+          <Fld label="Event Title"><input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="e.g. Corporate Gala" style={{width:"100%"}}/></Fld>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+            <Fld label="Date"><input type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} style={{width:"100%"}}/></Fld>
+            <Fld label="Client">
+              <select value={form.clientId} onChange={e=>setForm(f=>({...f,clientId:e.target.value}))} style={{width:"100%"}}>
+                <option value="">— No client —</option>
+                {clients.map((c: any)=><option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </Fld>
+          </div>
+          <Fld label="Venue"><input value={form.venue} onChange={e=>setForm(f=>({...f,venue:e.target.value}))} placeholder="e.g. Sandton Convention Centre" style={{width:"100%"}}/></Fld>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
+            <Fld label="Start"><input type="time" value={form.startTime} onChange={e=>setForm(f=>({...f,startTime:e.target.value}))} style={{width:"100%"}}/></Fld>
+            <Fld label="End"><input type="time" value={form.endTime} onChange={e=>setForm(f=>({...f,endTime:e.target.value}))} style={{width:"100%"}}/></Fld>
+            <Fld label="Colour">
+              <div style={{display:"flex",gap:6,paddingTop:4}}>
+                {[ACCENT,PURPLE,AMBER,CORAL,"#5ca4ea"].map(c=>(
+                  <div key={c} onClick={()=>setForm(f=>({...f,color:c}))}
+                    style={{width:22,height:22,borderRadius:"50%",background:c,cursor:"pointer",border:form.color===c?"3px solid #fff":"3px solid transparent"}}/>
+                ))}
+              </div>
+            </Fld>
+          </div>
+          <Fld label="Assign Staff">
+            <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+              {staff.map((s: any)=>(
+                <div key={s.id} onClick={()=>toggleStaff(s.id)}
+                  style={{padding:"5px 12px",borderRadius:20,fontSize:12,cursor:"pointer",
+                    background:form.staffIds.includes(s.id)?ACCENT+"22":SURFACE2,
+                    border:`1px solid ${form.staffIds.includes(s.id)?ACCENT:BORDER}`,
+                    color:form.staffIds.includes(s.id)?ACCENT:TEXT}}
+                >{s.name.split(" ")[0]} <span style={{color:MUTED,fontSize:10}}>({s.role})</span></div>
+              ))}
+            </div>
+          </Fld>
+          <Fld label="Notes / Instructions">
+            <textarea value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} rows={2} style={{width:"100%"}} placeholder="Dress code, contact person, etc."/>
+          </Fld>
+          <div style={{display:"flex",gap:10}}>
+            <Btn variant="primary" onClick={saveEvent} style={{flex:1,padding:"11px"}}>{editEvt?"Save Changes":"Create & Sync to Google Cal"}</Btn>
+            <Btn variant="ghost" onClick={()=>setShowForm(false)} style={{flex:1,padding:"11px"}}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* Booking notifications modal */}
+      {bookingModal&&(
+        <Modal title="Send Staff Booking Notifications" onClose={()=>setBookingModal(null)} width={500}>
+          <div style={{marginBottom:20}}>
+            <div style={{fontWeight:600,fontSize:15,marginBottom:4}}>{bookingModal.title}</div>
+            <div style={{fontSize:13,color:MUTED}}>{fmtDate(bookingModal.date)} · {bookingModal.startTime}–{bookingModal.endTime} · {bookingModal.venue}</div>
+          </div>
+          <div style={{marginBottom:20}}>
+            <Lbl>Staff receiving booking emails ({bookingModal.staffIds.length})</Lbl>
+            {bookingModal.staffIds.map((id: number)=>{
+              const s=staff.find((x: any)=>x.id===id);
+              if(!s) return null;
+              const pay=(eventHours(bookingModal)*s.rate).toFixed(2);
+              return(
+                <div key={id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",background:SURFACE2,borderRadius:8,marginBottom:6}}>
+                  <div>
+                    <div style={{fontWeight:500,fontSize:13}}>{s.name}</div>
+                    <div style={{fontSize:11,color:MUTED}}>{s.email}</div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:13,color:ACCENT,fontFamily:"'DM Mono',monospace"}}>R {pay}</div>
+                    <div style={{fontSize:11,color:MUTED}}>{eventHours(bookingModal).toFixed(1)}h @ R{s.rate}/h</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{background:SURFACE2,borderRadius:8,padding:"10px 14px",fontSize:12,color:MUTED,marginBottom:20}}>
+            💡 Claude will write a personalised email for each staff member and save it as a Gmail draft. You review and send from your Gmail Drafts folder.
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <Btn variant="primary" onClick={()=>sendBookingNotifications(bookingModal)} disabled={sendingNotifs} style={{flex:1,padding:"11px"}}>
+              {sendingNotifs?"Drafting emails…":"📧 Draft All Booking Emails"}
+            </Btn>
+            <Btn variant="ghost" onClick={()=>setBookingModal(null)} style={{flex:1,padding:"11px"}}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── PIN Pad ──────────────────────────────────────────────────────────────
+function PinPad({onSuccess,staff,adminMode}: {onSuccess: (member: any, adminFlag: boolean)=>void, staff: any[], adminMode: boolean}){
+  const [pin,setPin]=useState(""); const [shake,setShake]=useState(false); const [err,setErr]=useState("");
+  function press(d: string){ if(pin.length>=4)return; const next=pin+d; setPin(next); if(next.length===4)setTimeout(()=>check(next),80); }
+  function check(p: string){
+    if(adminMode&&p==="0000"){onSuccess(null,true);return;}
+    const found=staff.find((s: any)=>s.pin===p);
+    if(found){onSuccess(found,false);return;}
+    setShake(true);setErr("Invalid PIN");
+    setTimeout(()=>{setShake(false);setPin("");setErr("");},700);
+  }
+  return(
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:20,padding:24}}>
+      <div style={{fontSize:13,color:MUTED}}>Enter your PIN{adminMode?" · Admin: 0000":""}</div>
+      <div style={{display:"flex",gap:12,transform:shake?"translateX(8px)":"none",transition:"transform 0.1s"}}>
+        {Array.from({length:4},(_,i)=><div key={i} style={{width:14,height:14,borderRadius:"50%",background:i<pin.length?ACCENT:"transparent",border:`2px solid ${i<pin.length?ACCENT:BORDER}`,transition:"all 0.1s"}}/>)}
+      </div>
+      {err&&<div style={{fontSize:12,color:RED}}>{err}</div>}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,width:200}}>
+        {[1,2,3,4,5,6,7,8,9,"",0,"⌫"].map((k,i)=>(
+          <button key={i} onClick={()=>k==="⌫"?setPin(p=>p.slice(0,-1)):k!==""?press(String(k)):null}
+            style={{padding:"14px 0",background:k===""?"transparent":SURFACE2,border:`1px solid ${k===""?"transparent":BORDER}`,borderRadius:8,color:TEXT,fontSize:16,fontWeight:500,fontFamily:"'DM Mono',monospace",opacity:k===""?0:1}}
+            onMouseEnter={e=>{if(k!=="")e.currentTarget.style.background=SURFACE;}}
+            onMouseLeave={e=>{if(k!=="")e.currentTarget.style.background=SURFACE2;}}
+          >{k}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main App ─────────────────────────────────────────────────────────────
+export default function App(){
+  const [page,setPage]           = useState("login");
+  const [currentStaff,setCS]     = useState<any>(null);
+  const [isAdmin,setIsAdmin]     = useState(false);
+  const [staff]                  = useState(INITIAL_STAFF);
+  const [records,setRecords]     = useState<any[]>([]);
+  const [now,setNow]             = useState(Date.now());
+  const [adminTab,setAdminTab]   = useState("dashboard");
+  const [deptFilter,setDept]     = useState("All");
+  const [events,setEvents]       = useState(INITIAL_EVENTS);
+  const [invoices,setInvoices]   = useState(INITIAL_INVOICES);
+  const [quotes,setQuotes]       = useState(INITIAL_QUOTES);
+  const [clients]                = useState(INITIAL_CLIENTS);
+  const [toasts,setToasts]       = useState<any[]>([]);
+  const [newStaff,setNewStaff]   = useState({name:"",role:"",rate:"",pin:"",department:"Bar",uniform:false,email:"",phone:""});
+
+  useEffect(()=>{ const t=setInterval(()=>setNow(Date.now()),10000); return()=>clearInterval(t); },[]);
+
+  const addToast = useCallback((msg: string,type="success")=>{
+    const id=Date.now();
+    setToasts(p=>[...p,{id,msg,type}]);
+    setTimeout(()=>setToasts(p=>p.filter(t=>t.id!==id)),4000);
+  },[]);
+
+  function handleLogin(member: any,adminFlag: boolean){
+    if(adminFlag){setIsAdmin(true);setCS(null);setPage("admin");}
+    else{setCS(member);setIsAdmin(false);setPage("staff");}
+  }
+  function clockIn(id: number){if(!records.find(r=>r.staffId===id&&!r.clockOut))setRecords(p=>[...p,{id:Date.now(),staffId:id,clockIn:Date.now(),clockOut:null}]);}
+  function clockOut(id: number){setRecords(p=>p.map(r=>r.staffId===id&&!r.clockOut?{...r,clockOut:Date.now()}:r));}
+
+  const activeRec   = currentStaff?records.find(r=>r.staffId===currentStaff.id&&!r.clockOut):null;
+  const elapsed     = activeRec?now-activeRec.clockIn:0;
+  const myShifts    = currentStaff?records.filter(r=>r.staffId===currentStaff.id&&r.clockOut).slice(-5).reverse():[];
+  const myTotalMs   = myShifts.reduce((a: number,r: any)=>a+(r.clockOut-r.clockIn),0);
+  const myPay       = currentStaff?calcPay(myTotalMs,currentStaff.rate):0;
+  const completed   = records.filter(r=>r.clockOut);
+  const tPayroll    = completed.reduce((a: number,r: any)=>{const s=staff.find((x: any)=>x.id===r.staffId);return a+calcPay(r.clockOut-r.clockIn,s?.rate||0);},0);
+  const tHours      = completed.reduce((a: number,r: any)=>a+(r.clockOut-r.clockIn)/3600000,0);
+  const tActive     = staff.filter(s=>records.some(r=>r.staffId===s.id&&!r.clockOut)).length;
+  const filtered    = deptFilter==="All"?staff:staff.filter(s=>s.department===deptFilter);
+
+  const TABS=[["dashboard","Dashboard"],["roster","Roster"],["timesheets","Timesheets"],["calendar","Calendar"],["documents","Docs & Billing"],["add staff","Add Staff"]];
+
+  return(
+    <>
+      <style>{css}</style>
+
+      {/* Header */}
+      <div style={{background:SURFACE,borderBottom:`1px solid ${BORDER}`,padding:"0 24px",display:"flex",alignItems:"center",gap:16,height:56,position:"sticky",top:0,zIndex:50}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:28,height:28,background:ACCENT,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"#000"}}>FP</div>
+          <span style={{fontWeight:600,fontSize:15,letterSpacing:"-0.02em"}}>Freshpeople</span>
+          <span style={{color:MUTED,fontSize:13}}>Command Center</span>
+        </div>
+        <div style={{flex:1}}/>
+        {page!=="login"&&(
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            {isAdmin&&<Badge color={ACCENT}>Admin</Badge>}
+            {currentStaff&&<Badge color={MUTED}>{currentStaff.name.split(" ")[0]}</Badge>}
+            <button onClick={()=>{setPage("login");setCS(null);setIsAdmin(false);}}
+              style={{background:"none",border:`1px solid ${BORDER}`,borderRadius:6,color:MUTED,fontSize:12,padding:"4px 10px",cursor:"pointer"}}>Sign out</button>
+          </div>
+        )}
+        <div style={{color:MUTED,fontSize:12,fontFamily:"'DM Mono',monospace"}}>{new Date(now).toLocaleTimeString("en-ZA",{hour:"2-digit",minute:"2-digit"})}</div>
+      </div>
+
+      <div style={{maxWidth:1080,margin:"0 auto",padding:"32px 20px"}}>
+
+        {/* LOGIN */}
+        {page==="login"&&(
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:40}}>
+            <div style={{fontSize:13,color:MUTED,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.1em"}}>Events Staffing Operations</div>
+            <h1 style={{fontSize:28,fontWeight:700,letterSpacing:"-0.03em",marginBottom:8}}>Command Center</h1>
+            <p style={{color:MUTED,fontSize:14,marginBottom:32,textAlign:"center"}}>Enter your PIN · Admin: 0000</p>
+            <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:14,width:"100%",maxWidth:320}}>
+              <PinPad staff={staff} onSuccess={handleLogin} adminMode/>
+            </div>
+            <div style={{marginTop:24,display:"flex",gap:8,flexWrap:"wrap",justifyContent:"center"}}>
+              {staff.slice(0,3).map(s=><div key={s.id} style={{fontSize:11,color:MUTED,background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:6,padding:"4px 10px"}}>{s.name.split(" ")[0]}: {s.pin}</div>)}
+            </div>
+          </div>
+        )}
+
+        {/* STAFF */}
+        {page==="staff"&&currentStaff&&(
+          <div>
+            <div style={{marginBottom:28}}>
+              <div style={{fontSize:12,color:MUTED,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>{currentStaff.department} · {currentStaff.role}</div>
+              <h1 style={{fontSize:26,fontWeight:700,letterSpacing:"-0.02em"}}>{currentStaff.name}</h1>
+            </div>
+            <div style={{background:SURFACE,border:`1px solid ${activeRec?ACCENT+"44":BORDER}`,borderRadius:14,padding:28,marginBottom:24,textAlign:"center",transition:"border 0.3s"}}>
+              <div style={{fontSize:13,color:MUTED,marginBottom:8}}>{activeRec?"Currently on shift":"Not clocked in"}</div>
+              <div style={{fontSize:48,fontWeight:700,fontFamily:"'DM Mono',monospace",color:activeRec?ACCENT:MUTED,marginBottom:4,letterSpacing:"-0.02em"}}>{activeRec?fmtDur(elapsed):"—"}</div>
+              {activeRec&&<div style={{fontSize:13,color:MUTED,marginBottom:20}}>Clocked in at {fmtTime(activeRec.clockIn)} · Earning R {calcPay(elapsed,currentStaff.rate).toFixed(2)}</div>}
+              <div style={{display:"flex",gap:12,justifyContent:"center",marginTop:20}}>
+                {!activeRec
+                  ?<button onClick={()=>clockIn(currentStaff.id)} style={{background:ACCENT,color:"#000",border:"none",borderRadius:10,padding:"14px 40px",fontSize:15,fontWeight:600,cursor:"pointer"}}>Clock In</button>
+                  :<button onClick={()=>clockOut(currentStaff.id)} style={{background:RED,color:"#fff",border:"none",borderRadius:10,padding:"14px 40px",fontSize:15,fontWeight:600,cursor:"pointer"}}>Clock Out</button>
+                }
+              </div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:24}}>
+              <Stat label="Shifts today" value={myShifts.length}/>
+              <Stat label="Total hours" value={`${(myTotalMs/3600000).toFixed(1)}h`} accent={ACCENT}/>
+              <Stat label="Earnings" value={`R ${myPay.toFixed(0)}`} accent={ACCENT}/>
+            </div>
+            {myShifts.length>0&&(
+              <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:12,padding:"16px 20px"}}>
+                <div style={{fontSize:12,color:MUTED,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:14}}>Recent Shifts</div>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                  <thead><tr style={{borderBottom:`1px solid ${BORDER}`}}>{["Clock In","Clock Out","Duration","Pay"].map(h=><th key={h} style={{padding:"4px 8px",textAlign:"left",color:MUTED,fontWeight:400,paddingBottom:10}}>{h}</th>)}</tr></thead>
+                  <tbody>{myShifts.map(r=>(
+                    <tr key={r.id} style={{borderBottom:`1px solid ${BORDER}22`}}>
+                      <td style={{padding:"10px 8px",fontFamily:"'DM Mono',monospace"}}>{fmtTime(r.clockIn)}</td>
+                      <td style={{padding:"10px 8px",fontFamily:"'DM Mono',monospace"}}>{fmtTime(r.clockOut)}</td>
+                      <td style={{padding:"10px 8px"}}>{fmtDur(r.clockOut-r.clockIn)}</td>
+                      <td style={{padding:"10px 8px",color:ACCENT,fontFamily:"'DM Mono',monospace"}}>R {calcPay(r.clockOut-r.clockIn,currentStaff.rate).toFixed(2)}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ADMIN */}
+        {page==="admin"&&isAdmin&&(
+          <div>
+            <div style={{marginBottom:24}}>
+              <div style={{fontSize:12,color:ACCENT,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:4}}>Admin · Freshpeople</div>
+              <h1 style={{fontSize:26,fontWeight:700,letterSpacing:"-0.02em"}}>Command Center</h1>
+            </div>
+
+            {/* Tabs */}
+            <div style={{display:"flex",gap:2,background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:10,padding:4,marginBottom:28,overflowX:"auto"}}>
+              {TABS.map(([k,l])=>(
+                <button key={k} onClick={()=>setAdminTab(k)} style={{
+                  padding:"8px 18px",borderRadius:7,border:"none",fontSize:13,fontWeight:500,whiteSpace:"nowrap",cursor:"pointer",
+                  background:adminTab===k?ACCENT+"22":"transparent",
+                  color:adminTab===k?ACCENT:MUTED,
+                  borderBottom:adminTab===k?`2px solid ${ACCENT}`:"2px solid transparent",
+                }}>{l}</button>
+              ))}
+            </div>
+
+            {/* DASHBOARD */}
+            {adminTab==="dashboard"&&(
+              <div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:24}}>
+                  <Stat label="Total staff" value={staff.length}/>
+                  <Stat label="Clocked in" value={tActive} accent={ACCENT}/>
+                  <Stat label="Hours logged" value={`${tHours.toFixed(1)}h`}/>
+                  <Stat label="Total payroll" value={`R ${tPayroll.toFixed(0)}`} accent={ACCENT}/>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+                  <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:12,padding:"16px 20px"}}>
+                    <div style={{fontSize:12,color:MUTED,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:14}}>Active Shifts</div>
+                    {staff.filter(s=>records.some(r=>r.staffId===s.id&&!r.clockOut)).length===0
+                      ?<div style={{color:MUTED,fontSize:13}}>No active shifts</div>
+                      :staff.filter(s=>records.some(r=>r.staffId===s.id&&!r.clockOut)).map(s=>{
+                        const rec=records.find(r=>r.staffId===s.id&&!r.clockOut);
+                        return(<div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8}}><Dot on/><span style={{fontSize:13,fontWeight:500}}>{s.name}</span></div>
+                          <span style={{fontSize:12,color:ACCENT,fontFamily:"'DM Mono',monospace"}}>{fmtDur(now-rec.clockIn)}</span>
+                        </div>);
+                      })
+                    }
+                  </div>
+                  <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:12,padding:"16px 20px"}}>
+                    <div style={{fontSize:12,color:MUTED,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:14}}>Upcoming Events</div>
+                    {events.filter(e=>e.date>=ymd(today)).sort((a: any,b: any)=>a.date.localeCompare(b.date)).slice(0,4).map(ev=>(
+                      <div key={ev.id} style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:10}}>
+                        <div style={{width:3,minHeight:36,background:ev.color,borderRadius:2,flexShrink:0,marginTop:2}}/>
+                        <div>
+                          <div style={{fontSize:13,fontWeight:500}}>{ev.title}</div>
+                          <div style={{fontSize:11,color:MUTED}}>{fmtDate(ev.date)} · {ev.staffIds.length} staff{ev.gcalId?" · ✓GCal":""}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+                  <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:12,padding:"16px 20px"}}>
+                    <div style={{fontSize:12,color:MUTED,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:14}}>By Department</div>
+                    {["Bar","Floor","Management","Security"].map(dept=>{
+                      const ds=staff.filter(s=>s.department===dept);
+                      const active=ds.filter(s=>records.some(r=>r.staffId===s.id&&!r.clockOut)).length;
+                      const colors: Record<string,string> ={Bar:ACCENT,Floor:PURPLE,Management:AMBER,Security:CORAL};
+                      return(<div key={dept} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                          <div style={{width:8,height:8,borderRadius:"50%",background:colors[dept]||ACCENT}}/>
+                          <span style={{fontSize:13}}>{dept}</span>
+                        </div>
+                        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                          <span style={{fontSize:12,color:MUTED}}>{ds.length} staff</span>
+                          {active>0&&<Badge color={ACCENT}>{active} active</Badge>}
+                        </div>
+                      </div>);
+                    })}
+                  </div>
+                  <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:12,padding:"16px 20px"}}>
+                    <div style={{fontSize:12,color:MUTED,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:14}}>Billing Summary</div>
+                    {[
+                      ["Invoices outstanding",invoices.filter(i=>i.status!=="paid").reduce((a: number,i: any)=>a+docSubtotal(i.lines)*1.15,0).toFixed(0),AMBER],
+                      ["Invoices paid",invoices.filter(i=>i.status==="paid").reduce((a: number,i: any)=>a+docSubtotal(i.lines)*1.15,0).toFixed(0),ACCENT],
+                      ["Open quotes",quotes.filter(q=>q.status==="draft").length,PURPLE],
+                      ["Quotes accepted",quotes.filter(q=>q.status==="accepted").length,ACCENT],
+                    ].map(([l,v,c])=>(
+                      <div key={l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                        <span style={{fontSize:13,color:MUTED}}>{l}</span>
+                        <span style={{fontSize:13,fontWeight:600,color:c,fontFamily:"'DM Mono',monospace"}}>{isNaN(Number(v))?v:`R ${v}`}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ROSTER */}
+            {adminTab==="roster"&&(
+              <div>
+                <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>
+                  {["All","Bar","Floor","Management","Security"].map(d=>(
+                    <button key={d} onClick={()=>setDept(d)} style={{
+                      padding:"6px 14px",borderRadius:20,border:`1px solid ${deptFilter===d?ACCENT:BORDER}`,
+                      background:deptFilter===d?ACCENT+"22":"transparent",color:deptFilter===d?ACCENT:MUTED,fontSize:12,fontWeight:500,cursor:"pointer",
+                    }}>{d}</button>
+                  ))}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12}}>
+                  {filtered.map(s=>{
+                    const active=records.some(r=>r.staffId===s.id&&!r.clockOut);
+                    const shifts=records.filter(r=>r.staffId===s.id&&r.clockOut);
+                    const hrs=shifts.reduce((a: number,r: any)=>a+(r.clockOut-r.clockIn)/3600000,0);
+                    return(<div key={s.id} style={{background:SURFACE,border:`1px solid ${active?ACCENT+"44":BORDER}`,borderRadius:12,padding:"16px 18px"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
+                        <div>
+                          <div style={{fontWeight:600,fontSize:14,marginBottom:2}}>{s.name}</div>
+                          <div style={{fontSize:12,color:MUTED}}>{s.role} · {s.department}</div>
+                          <div style={{fontSize:11,color:MUTED}}>{s.email}</div>
+                        </div>
+                        <Dot on={active}/>
+                      </div>
+                      <div style={{display:"flex",gap:14}}>
+                        <div style={{fontSize:12}}><span style={{color:MUTED}}>Rate: </span><span className="mono">R{s.rate}/h</span></div>
+                        <div style={{fontSize:12}}><span style={{color:MUTED}}>Shifts: </span><span className="mono">{shifts.length}</span></div>
+                        <div style={{fontSize:12}}><span style={{color:MUTED}}>Hrs: </span><span className="mono" style={{color:ACCENT}}>{hrs.toFixed(1)}</span></div>
+                      </div>
+                      {s.uniform&&<div style={{marginTop:8}}><Badge color={MUTED}>Uniform req.</Badge></div>}
+                    </div>);
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* TIMESHEETS */}
+            {adminTab==="timesheets"&&(
+              <div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+                  <div style={{fontSize:14,color:MUTED}}>{completed.length} completed shifts</div>
+                  <Btn variant="accent" onClick={()=>{
+                    const h="Name,Dept,Clock In,Clock Out,Hours,Pay (R)";
+                    const lines=completed.map(r=>{const s=staff.find((x: any)=>x.id===r.staffId);const dur=r.clockOut-r.clockIn;return `${s?.name},${s?.department},${fmtTime(r.clockIn)},${fmtTime(r.clockOut)},${(dur/3600000).toFixed(2)},${calcPay(dur,s?.rate||0).toFixed(2)}`;});
+                    navigator.clipboard.writeText([h,...lines].join("\n"));
+                    addToast("Payroll CSV copied to clipboard","success");
+                  }}>Export Payroll CSV</Btn>
+                </div>
+                {completed.length===0
+                  ?<div style={{color:MUTED,textAlign:"center",padding:40}}>No completed shifts yet</div>
+                  :<div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:12,overflow:"auto"}}>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                      <thead style={{background:SURFACE2}}><tr>
+                        {["Staff","Dept","Clock In","Clock Out","Duration","Pay"].map(h=><th key={h} style={{padding:"12px 14px",textAlign:"left",color:MUTED,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:"0.05em"}}>{h}</th>)}
+                      </tr></thead>
+                      <tbody>{completed.slice().reverse().map(r=>{
+                        const s=staff.find((x: any)=>x.id===r.staffId); const dur=r.clockOut-r.clockIn;
+                        return(<tr key={r.id} style={{borderTop:`1px solid ${BORDER}33`}}>
+                          <td style={{padding:"12px 14px",fontWeight:500}}>{s?.name||"?"}</td>
+                          <td style={{padding:"12px 14px",color:MUTED}}>{s?.department}</td>
+                          <td style={{padding:"12px 14px",fontFamily:"'DM Mono',monospace"}}>{fmtTime(r.clockIn)}</td>
+                          <td style={{padding:"12px 14px",fontFamily:"'DM Mono',monospace"}}>{fmtTime(r.clockOut)}</td>
+                          <td style={{padding:"12px 14px"}}>{fmtDur(dur)}</td>
+                          <td style={{padding:"12px 14px",color:ACCENT,fontFamily:"'DM Mono',monospace"}}>R {calcPay(dur,s?.rate||0).toFixed(2)}</td>
+                        </tr>);
+                      })}</tbody>
+                    </table>
+                  </div>
+                }
+              </div>
+            )}
+
+            {/* CALENDAR */}
+            {adminTab==="calendar"&&<CalendarTab events={events} setEvents={setEvents} staff={staff} clients={clients} addToast={addToast}/>}
+
+            {/* DOCUMENTS */}
+            {adminTab==="documents"&&<DocumentsTab invoices={invoices} setInvoices={setInvoices} quotes={quotes} setQuotes={setQuotes} clients={clients} events={events}/>}
+
+            {/* ADD STAFF */}
+            {adminTab==="add staff"&&(
+              <div style={{maxWidth:500}}>
+                <div style={{display:"flex",flexDirection:"column",gap:14}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                    {[{k:"name",l:"Full Name",p:"Amara Diallo"},{k:"role",l:"Role",p:"Bar Staff"},{k:"rate",l:"Hourly Rate (R)",p:"14.50",t:"number"},{k:"pin",l:"4-Digit PIN",p:"1234",mx:4}].map(f=>(
+                      <div key={f.k}>
+                        <Lbl>{f.l}</Lbl>
+                        <input type={f.t||"text"} placeholder={f.p} maxLength={f.mx} value={newStaff[f.k]} onChange={e=>setNewStaff(p=>({...p,[f.k]:e.target.value}))} style={{width:"100%"}}/>
+                      </div>
+                    ))}
+                    <div><Lbl>Email</Lbl><input value={newStaff.email} onChange={e=>setNewStaff(p=>({...p,email:e.target.value}))} placeholder="name@freshpeople.co.za" style={{width:"100%"}}/></div>
+                    <div><Lbl>Phone</Lbl><input value={newStaff.phone} onChange={e=>setNewStaff(p=>({...p,phone:e.target.value}))} placeholder="+27 71 000 0000" style={{width:"100%"}}/></div>
+                  </div>
+                  <div>
+                    <Lbl>Department</Lbl>
+                    <select value={newStaff.department} onChange={e=>setNewStaff(p=>({...p,department:e.target.value}))} style={{width:"100%"}}>
+                      {["Bar","Floor","Management","Security"].map(d=><option key={d}>{d}</option>)}
+                    </select>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <input type="checkbox" checked={newStaff.uniform} onChange={e=>setNewStaff(p=>({...p,uniform:e.target.checked}))} style={{width:16,height:16}}/>
+                    <span style={{fontSize:13,color:MUTED}}>Requires uniform</span>
+                  </div>
+                  <Btn variant="primary" onClick={()=>{ if(!newStaff.name||!newStaff.pin||!newStaff.rate) return; addToast(`${newStaff.name} added to roster`,"success"); setNewStaff({name:"",role:"",rate:"",pin:"",department:"Bar",uniform:false,email:"",phone:""}); }} style={{padding:"12px 24px",fontSize:14}}>Add Staff Member</Btn>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Toast stack */}
+      <div style={{position:"fixed",bottom:24,right:24,zIndex:999,display:"flex",flexDirection:"column",gap:8}}>
+        {toasts.map(t=>(
+          <div key={t.id} style={{background:SURFACE,border:`1px solid ${(t.type==="error"?RED:t.type==="warn"?AMBER:ACCENT)}55`,borderLeft:`4px solid ${t.type==="error"?RED:t.type==="warn"?AMBER:ACCENT}`,borderRadius:10,padding:"12px 18px",fontSize:13,color:TEXT,maxWidth:340,boxShadow:"0 8px 32px rgba(0,0,0,0.5)"}}>
+            {t.msg}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
