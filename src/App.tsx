@@ -557,29 +557,25 @@ function CalendarTab({events,setEvents,staff,clients,addToast}){
   async function fetchGcal(){
     setSyncing(true);
     try{
-      // This calls the connected Google Calendar MCP tool via the API
-      const start=new Date(yr,mo,1).toISOString();
-      const end=new Date(yr,mo+1,0,23,59).toISOString();
-      const resp=await fetch("https://api.anthropic.com/v1/messages",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          model:"claude-sonnet-4-20250514",
-          max_tokens:2000,
-          system:"You are a calendar assistant. Return ONLY a JSON array of events. Each: {id,title,date,startTime,endTime,location}. Dates as YYYY-MM-DD, times as HH:MM. No extra text.",
-          messages:[{role:"user",content:`List my Google Calendar events from ${start} to ${end}. Return JSON array only.`}],
-          mcp_servers:[{type:"url",url:"https://calendarmcp.googleapis.com/mcp/v1",name:"gcal"}]
-        })
-      });
+      // Fetch events from Google Calendar via our API
+      const resp=await fetch('/api/calendar/google');
       const data=await resp.json();
-      const text=data.content?.find(b=>b.type==="text")?.text||"[]";
-      const cleaned=text.replace(/```json|```/g,"").trim();
-      try{
-        const parsed=JSON.parse(cleaned);
-        if(Array.isArray(parsed)) setGcalEvents(parsed.map(e=>({...e,isGcal:true,color:"#5ca4ea"})));
-      }catch{}
-      addToast("Google Calendar synced ✓","success");
-    }catch(e){ addToast("Could not fetch GCal events","error"); }
+      
+      if(data.success && Array.isArray(data.events)){
+        setGcalEvents(data.events.map(e=>({
+          ...e,
+          isGcal:true,
+          color:"#5ca4ea",
+          date:e.start.split('T')[0] // Extract date from ISO string
+        })));
+        addToast(`Google Calendar synced ✓ (${data.events.length} events)`,"success");
+      } else {
+        addToast("No Google Calendar events found","info");
+      }
+    }catch(e){ 
+      console.error('GCal sync error:', e);
+      addToast("Could not fetch GCal events - check API config","error"); 
+    }
     setSyncing(false);
   }
 
