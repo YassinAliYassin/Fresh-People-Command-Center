@@ -557,8 +557,8 @@ function CalendarTab({events,setEvents,staff,clients,addToast}){
   async function fetchGcal(){
     setSyncing(true);
     try{
-      // Fetch events from Google Calendar via our API
-      const resp=await fetch('/api/calendar/google');
+      // Fetch events from Apple Calendar via Nylas (old working method)
+      const resp=await fetch('/api/calendar/nylas');
       const data=await resp.json();
       
       if(data.success && Array.isArray(data.events)){
@@ -566,15 +566,17 @@ function CalendarTab({events,setEvents,staff,clients,addToast}){
           ...e,
           isGcal:true,
           color:"#5ca4ea",
-          date:e.start.split('T')[0] // Extract date from ISO string
+          date:e.start.split('T')[0]
         })));
-        addToast(`Google Calendar synced ✓ (${data.events.length} events)`,"success");
+        addToast(`Apple Calendar synced via Nylas ✓ (${data.events.length} events)`,"success");
+      } else if(data.error){
+        addToast(`Sync error: ${data.error}`,"error");
       } else {
-        addToast("No Google Calendar events found","info");
+        addToast("No Apple Calendar events found","info");
       }
     }catch(e){ 
-      console.error('GCal sync error:', e);
-      addToast("Could not fetch GCal events - check API config","error"); 
+      console.error('Nylas sync error:', e);
+      addToast("Could not sync Apple Calendar - check Nylas config","error"); 
     }
     setSyncing(false);
   }
