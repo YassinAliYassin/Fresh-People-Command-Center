@@ -580,9 +580,9 @@ function CalendarTab({events,setEvents,staff,clients,addToast}){
     }
     setSyncing(false);
   }
-
-  // Push event to GCal
+  // Push event to GCal (Google Calendar)
   async function pushToGcal(ev){
+    if(!ev?.id) return;
     try{
       const [sh,sm]=ev.startTime.split(":").map(Number);
       const [eh,em]=ev.endTime.split(":").map(Number);
@@ -592,22 +592,31 @@ function CalendarTab({events,setEvents,staff,clients,addToast}){
       const staffNames=ev.staffIds.map(id=>staff.find(s=>s.id===id)?.name||"Staff").join(", ");
       const description=`Freshpeople Event\nVenue: ${ev.venue||""}\nStaff: ${staffNames}\n${ev.notes||""}`;
 
-      const resp=await fetch("https://api.anthropic.com/v1/messages",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
+      // Push to Google Calendar via our API
+      const resp=await fetch('/api/calendar/google',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
-          model:"claude-sonnet-4-20250514",
-          max_tokens:500,
-          system:"Create the Google Calendar event as requested. Return only the event ID string, nothing else.",
-          messages:[{role:"user",content:`Create a Google Calendar event: title="${ev.title}", start="${start}", end="${end}", location="${ev.venue||""}", description="${description}". Return the created event ID only.`}],
-          mcp_servers:[{type:"url",url:"https://calendarmcp.googleapis.com/mcp/v1",name:"gcal"}]
+          title:ev.title,
+          start:start,
+          end:end,
+          description:description,
+          location:ev.venue||''
         })
       });
+      
       const data=await resp.json();
-      const gcalId=data.content?.find(b=>b.type==="text")?.text?.trim()||null;
-      setEvents(prev=>prev.map(e=>e.id===ev.id?{...e,gcalId}:e));
-      addToast(`"${ev.title}" pushed to Google Calendar ✓`,"success");
-    }catch(e){ addToast("Failed to push to Google Calendar","error"); }
+      
+      if(data.success){
+        setEvents(prev=>prev.map(e=>e.id===ev.id?{...e,gcalId:data.eventId}:e));
+        addToast(`"${ev.title}" pushed to Google Calendar ✓`,"success");
+      } else {
+        addToast(`Failed to push: ${data.error||'Unknown error'}`,"error");
+      }
+    }catch(e){ 
+      console.error('Push to GCal error:', e);
+      addToast("Failed to push to Google Calendar","error"); 
+    }
   }
 
   // Send staff booking notifications via Gmail drafts
