@@ -1,4 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
+import ClientsView from './components/ClientsView';
+import Dashboard from './components/Dashboard';
+import Payroll from './pages/Payroll';
 
 // ─── Constants & Seed ────────────────────────────────────────────────────────
 const INITIAL_STAFF = [
@@ -366,7 +369,6 @@ function DocumentsTab({invoices,setInvoices,quotes,setQuotes,clients,events}){
   const [showForm,setShowForm] = useState(null);       // "invoice" | "quote" | null
   const [printDoc,setPrintDoc] = useState(null);
   const [stmtClient,setStmtClient] = useState("");
-  const [filterStatus,setFilter] = useState("all");
   const [toast,setToast]       = useState(null);
 
   const allDocs = [...invoices,...quotes];
@@ -399,8 +401,7 @@ function DocumentsTab({invoices,setInvoices,quotes,setQuotes,clients,events}){
   }
 
   const renderDocs = (docs, setter, isInvoice) => {
-    const filtered = filterStatus==="all" ? docs : docs.filter(d=>d.status===filterStatus);
-    if(!filtered.length) return <div style={{textAlign:"center",padding:48,color:MUTED,fontSize:14}}>No documents found</div>;
+    if(!docs.length) return <div style={{textAlign:"center",padding:48,color:MUTED,fontSize:14}}>No documents found</div>;
     return(
       <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:12,overflow:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
@@ -409,7 +410,7 @@ function DocumentsTab({invoices,setInvoices,quotes,setQuotes,clients,events}){
               <th key={h} style={{padding:"12px 14px",textAlign:"left",color:MUTED,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:"0.05em"}}>{h}</th>
             ))}
           </tr></thead>
-          <tbody>{filtered.map(doc=>{
+          <tbody>{docs.map(doc=>{
             const client=clients.find(c=>c.id===doc.clientId);
             const event=events.find(e=>e.id===doc.eventId);
             const total=(docSubtotal(doc.lines)*1.15).toFixed(2);
@@ -465,18 +466,9 @@ function DocumentsTab({invoices,setInvoices,quotes,setQuotes,clients,events}){
         ))}
       </div>
 
-      {/* Controls */}
+      {/* Controls - simplified */}
       {view!=="statements"&&(
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            {["all","draft","sent",view==="invoices"?"paid":"accepted",view==="invoices"?"overdue":"declined"].map(s=>(
-              <button key={s} onClick={()=>setFilter(s)} style={{
-                padding:"5px 13px",borderRadius:20,border:`1px solid ${filterStatus===s?(STATUS_COLOR[s]||ACCENT):BORDER}`,
-                background:filterStatus===s?(STATUS_COLOR[s]||ACCENT)+"22":"transparent",
-                color:filterStatus===s?(STATUS_COLOR[s]||ACCENT):MUTED,fontSize:12,fontWeight:500,textTransform:"capitalize",
-              }}>{s}</button>
-            ))}
-          </div>
+        <div style={{display:"flex",justifyContent:"flex-end",marginBottom:16}}>
           <Btn variant="primary" onClick={()=>setShowForm(view==="invoices"?"invoice":"quote")}>
             + New {view==="invoices"?"Invoice":"Quote"}
           </Btn>
@@ -957,7 +949,6 @@ export default function App(){
   const [records,setRecords]     = useState([]);
   const [now,setNow]             = useState(Date.now());
   const [adminTab,setAdminTab]   = useState("dashboard");
-  const [deptFilter,setDept]     = useState("All");
   const [events,setEvents]       = useState(INITIAL_EVENTS);
   const [invoices,setInvoices]   = useState(INITIAL_INVOICES);
   const [quotes,setQuotes]       = useState(INITIAL_QUOTES);
@@ -989,7 +980,6 @@ export default function App(){
   const tPayroll    = completed.reduce((a,r)=>{const s=staff.find(x=>x.id===r.staffId);return a+calcPay(r.clockOut-r.clockIn,s?.rate||0);},0);
   const tHours      = completed.reduce((a,r)=>a+(r.clockOut-r.clockIn)/3600000,0);
   const tActive     = staff.filter(s=>records.some(r=>r.staffId===s.id&&!r.clockOut)).length;
-  const filtered    = deptFilter==="All"?staff:staff.filter(s=>s.department===deptFilter);
 
   const TABS=[["dashboard","Dashboard"],["roster","Roster"],["timesheets","Timesheets"],["calendar","Calendar"],["documents","Docs & Billing"],["add staff","Add Staff"]];
 
@@ -1096,89 +1086,15 @@ export default function App(){
             </div>
 
             {/* DASHBOARD */}
-            {adminTab==="dashboard"&&(
-              <div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:24}}>
-                  <Stat label="Total staff" value={staff.length}/>
-                  <Stat label="Clocked in" value={tActive} accent={ACCENT}/>
-                  <Stat label="Hours logged" value={`${tHours.toFixed(1)}h`}/>
-                  <Stat label="Total payroll" value={`R ${tPayroll.toFixed(0)}`} accent={ACCENT}/>
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
-                  <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:12,padding:"16px 20px"}}>
-                    <div style={{fontSize:12,color:MUTED,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:14}}>Active Shifts</div>
-                    {staff.filter(s=>records.some(r=>r.staffId===s.id&&!r.clockOut)).length===0
-                      ?<div style={{color:MUTED,fontSize:13}}>No active shifts</div>
-                      :staff.filter(s=>records.some(r=>r.staffId===s.id&&!r.clockOut)).map(s=>{
-                        const rec=records.find(r=>r.staffId===s.id&&!r.clockOut);
-                        return(<div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                          <div style={{display:"flex",alignItems:"center",gap:8}}><Dot on/><span style={{fontSize:13,fontWeight:500}}>{s.name}</span></div>
-                          <span style={{fontSize:12,color:ACCENT,fontFamily:"'DM Mono',monospace"}}>{fmtDur(now-rec.clockIn)}</span>
-                        </div>);
-                      })
-                    }
-                  </div>
-                  <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:12,padding:"16px 20px"}}>
-                    <div style={{fontSize:12,color:MUTED,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:14}}>Upcoming Events</div>
-                    {events.filter(e=>e.date>=ymd(today)).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,4).map(ev=>(
-                      <div key={ev.id} style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:10}}>
-                        <div style={{width:3,minHeight:36,background:ev.color,borderRadius:2,flexShrink:0,marginTop:2}}/>
-                        <div>
-                          <div style={{fontSize:13,fontWeight:500}}>{ev.title}</div>
-                          <div style={{fontSize:11,color:MUTED}}>{fmtDate(ev.date)} · {ev.staffIds.length} staff{ev.gcalId?" · ✓GCal":""}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
-                  <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:12,padding:"16px 20px"}}>
-                    <div style={{fontSize:12,color:MUTED,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:14}}>By Department</div>
-                    {["Bar","Floor","Management","Security"].map(dept=>{
-                      const ds=staff.filter(s=>s.department===dept);
-                      const active=ds.filter(s=>records.some(r=>r.staffId===s.id&&!r.clockOut)).length;
-                      const colors={Bar:ACCENT,Floor:PURPLE,Management:AMBER,Security:CORAL};
-                      return(<div key={dept} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                        <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                          <div style={{width:8,height:8,borderRadius:"50%",background:colors[dept]||ACCENT}}/>
-                          <span style={{fontSize:13}}>{dept}</span>
-                        </div>
-                        <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                          <span style={{fontSize:12,color:MUTED}}>{ds.length} staff</span>
-                          {active>0&&<Badge color={ACCENT}>{active} active</Badge>}
-                        </div>
-                      </div>);
-                    })}
-                  </div>
-                  <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:12,padding:"16px 20px"}}>
-                    <div style={{fontSize:12,color:MUTED,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:14}}>Billing Summary</div>
-                    {[
-                      ["Invoices outstanding",invoices.filter(i=>i.status!=="paid").reduce((a,i)=>a+docSubtotal(i.lines)*1.15,0).toFixed(0),AMBER],
-                      ["Invoices paid",invoices.filter(i=>i.status==="paid").reduce((a,i)=>a+docSubtotal(i.lines)*1.15,0).toFixed(0),ACCENT],
-                      ["Open quotes",quotes.filter(q=>q.status==="draft").length,PURPLE],
-                      ["Quotes accepted",quotes.filter(q=>q.status==="accepted").length,ACCENT],
-                    ].map(([l,v,c])=>(
-                      <div key={l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                        <span style={{fontSize:13,color:MUTED}}>{l}</span>
-                        <span style={{fontSize:13,fontWeight:600,color:c,fontFamily:"'DM Mono',monospace"}}>{isNaN(v)?v:`R ${v}`}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* DASHBOARD - Executive Intelligence Agent */}
+            {adminTab==="dashboard"&&<Dashboard staff={staff} events={events} clients={clients} records={records} now={now} addToast={addToast}/>}
 
-            {/* ROSTER */}
+            {/* CLIENTS - CRM Agent */}
+            {adminTab==="clients"&&<ClientsView clients={clients} events={events} addToast={addToast}/>}
+
+            {/* ROSTER - simplified, no filters */}
             {adminTab==="roster"&&(
               <div>
-                <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>
-                  {["All","Bar","Floor","Management","Security"].map(d=>(
-                    <button key={d} onClick={()=>setDept(d)} style={{
-                      padding:"6px 14px",borderRadius:20,border:`1px solid ${deptFilter===d?ACCENT:BORDER}`,
-                      background:deptFilter===d?ACCENT+"22":"transparent",color:deptFilter===d?ACCENT:MUTED,fontSize:12,fontWeight:500,cursor:"pointer",
-                    }}>{d}</button>
-                  ))}
-                </div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12}}>
                   {filtered.map(s=>{
                     const active=records.some(r=>r.staffId===s.id&&!r.clockOut);
@@ -1246,6 +1162,9 @@ export default function App(){
 
             {/* DOCUMENTS */}
             {adminTab==="documents"&&<DocumentsTab invoices={invoices} setInvoices={setInvoices} quotes={quotes} setQuotes={setQuotes} clients={clients} events={events}/>}
+
+            {/* PAYROLL - Finance Agent */}
+            {adminTab==="payroll"&&<Payroll staff={staff} events={events} records={records} addToast={addToast}/>}
 
             {/* ADD STAFF */}
             {adminTab==="add staff"&&(
