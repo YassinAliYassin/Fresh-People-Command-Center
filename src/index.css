@@ -482,13 +482,67 @@ tr:hover {
 }
 
 @keyframes float {
-  0%, 100% {
-    transform: translate(0, 0) scale(1);
-  }
-  33% {
-    transform: translate(30px, -30px) scale(1.1);
-  }
-  66% {
-    transform: translate(-20px, 20px) scale(0.9);
-  }
+ 0%, 100% {
+   transform: translate(0, 0) scale(1);
+ }
+ 33% {
+   transform: translate(30px, -30px) scale(1.1);
+ }
+ 66% {
+   transform: translate(-20px, 20px) scale(0.9);
+ }
+}
+
+/* ==========================================
+   MOBILE RESPONSIVENESS
+========================================== */
+
+@media (max-width: 768px) {
+ /* Stack dashboard grids */
+ [style*="grid-template-columns"] {
+   grid-template-columns: 1fr !important;
+ }
+ 
+ /* Bigger touch targets */
+ button, [role="button"] {
+   min-height: 44px;
+   font-size: 14px !important;
+ }
+ 
+ /* Reduce padding */
+ [style*="padding"] {
+   padding: 12px !important;
+ }
+ 
+ /* Make text readable */
+ [style*="font-size: 11px"] {
+   font-size: 12px !important;
+ }
+ 
+ [style*="font-size: 12px"] {
+   font-size: 14px !important;
+ }
+ 
+ /* Stack flex containers */
+ [style*="display: flex"] {
+   flex-direction: column;
+   gap: 8px;
+ }
+ 
+ /* Full-width buttons */
+ button[style*="padding: 6px 14px"] {
+   width: 100%;
+   padding: 12px !important;
+ }
+}
+
+@media (max-width: 480px) {
+ /* Extra small devices */
+ [style*="font-size: 18px"] {
+   font-size: 16px !important;
+ }
+ 
+ h1, h2, h3 {
+   font-size: 1.2em !important;
+ }
 }
