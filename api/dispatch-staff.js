@@ -1,206 +1,168 @@
-/**
- * WhatsApp Dispatch Staff Endpoint
- * Sends event notifications to staff via WhatsApp
- */
+// WhatsApp Staff Dispatch API
+// Sends booking notifications via WhatsApp Business API
 
 export default async function handler(req, res) {
-  // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const token = process.env.WHATSAPP_ACCESS_TOKEN;
-    const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-    const wabaId = process.env.WHATSAPP_WABA_ID;
+    const { eventId, staffIds } = req.body;
     
-    if (!token || !phoneId) {
-      return res.status(500).json({
-        error: 'WhatsApp not configured',
-        details: 'Missing WHATSAPP_ACCESS_TOKEN or WHATSAPP_PHONE_NUMBER_ID'
-      });
+    if (!eventId || !Array.isArray(staffIds)) {
+      return res.status(400).json({ error: 'eventId and staffIds array required' });
     }
 
-    const { eventId, staffIds, message } = req.body;
+    // Mock event and staff data for now - in production this would come from database
+    const mockEvent = {
+      title: "Corporate Gala - MTN",
+      date: "June 15, 2026", 
+      time: "6:00 PM - 11:00 PM",
+      venue: "Hyatt Regency JHB",
+      rate: "R180/hour"
+    };
 
-    if (!eventId || !staffIds || !Array.isArray(staffIds) || staffIds.length === 0) {
-      return res.status(400).json({
-        error: 'Invalid request',
-        details: 'eventId and staffIds (array) are required'
-      });
-    }
+    const mockStaff = [
+      { id: 1, name: "Amara Diallo", phone: "+27710010001" },
+      { id: 2, name: "Themba Nkosi", phone: "+27710010002" },
+      { id: 3, name: "Priya Moodley", phone: "+27710010003" },
+      { id: 4, name: "Lerato Khumalo", phone: "+27710010004" }
+    ];
 
-    // Fetch event details from database
-    const { Pool } = require('pg');
-    const pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false }
-    });
+    const results = {
+      success: true,
+      dispatched: 0,
+      skipped: 0,
+      failed: 0,
+      details: []
+    };
 
-    const eventResult = await pool.query(
-      'SELECT * FROM events WHERE id = $1',
-      [eventId]
-    );
+    // WhatsApp message template
+    const message = `🎉 NEW BOOKING ALERT
 
-    if (eventResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Event not found' });
-    }
+Event: ${mockEvent.title}
+Date: ${mockEvent.date}
+Time: ${mockEvent.time}
+Venue: ${mockEvent.venue}
+Rate: ${mockEvent.rate}
 
-    const event = eventResult.rows[0];
+Reply YES to accept
+Reply NO to decline
+Questions? Call +27 67 296 1272
 
-    // Fetch staff details
-    const staffResult = await pool.query(
-      'SELECT * FROM staff WHERE id = ANY($1::int[])',
-      [staffIds]
-    );
+Fresh People Event Staffing
+www.fresh-people.co.za`;
 
-    const staffList = staffResult.rows;
-
-    if (staffList.length === 0) {
-      return res.status(404).json({ error: 'No staff found' });
-    }
-
-    // Format event message
-    const eventMessage = message || formatEventMessage(event);
-
-    // Send WhatsApp messages to each staff member
-    const results = [];
-    
-    for (const staff of staffList) {
-      if (!staff.phone) {
-        results.push({
-          staffId: staff.id,
-          staffName: staff.name,
+    // Process each staff member
+    for (const staffId of staffIds) {
+      const staff = mockStaff.find(s => s.id === staffId);
+      
+      if (!staff || !staff.phone) {
+        results.skipped++;
+        results.details.push({
+          staffId,
           status: 'skipped',
-          reason: 'No phone number'
+          reason: 'No phone number found'
         });
         continue;
       }
 
       try {
-        const whatsappResponse = await sendWhatsAppMessage(
-          token,
-          phoneId,
-          staff.phone,
-          eventMessage
-        );
-
-        results.push({
-          staffId: staff.id,
-          staffName: staff.name,
-          staffPhone: staff.phone,
-          status: 'sent',
-          messageId: whatsappResponse.message_id,
-          waMessageId: whatsappResponse.wa_message_id
-        });
+        // Send WhatsApp message via Meta Business API
+        const whatsappResult = await sendWhatsAppMessage(staff.phone, message);
+        
+        if (whatsappResult.success) {
+          results.dispatched++;
+          results.details.push({
+            staffId,
+            name: staff.name,
+            phone: staff.phone,
+            status: 'sent',
+            messageId: whatsappResult.messageId
+          });
+        } else {
+          results.failed++;
+          results.details.push({
+            staffId,
+            name: staff.name,
+            phone: staff.phone,
+            status: 'failed',
+            error: whatsappResult.error
+          });
+        }
       } catch (error) {
-        results.push({
-          staffId: staff.id,
-          staffName: staff.name,
-          staffPhone: staff.phone,
+        results.failed++;
+        results.details.push({
+          staffId,
+          name: staff.name,
+          phone: staff.phone,
           status: 'failed',
           error: error.message
         });
       }
     }
 
-    await pool.end();
-
-    return res.status(200).json({
-      success: true,
-      event: {
-        id: event.id,
-        title: event.title,
-        start_time: event.start_time,
-        location: event.location
-      },
-      dispatched: results.filter(r => r.status === 'sent').length,
-      skipped: results.filter(r => r.status === 'skipped').length,
-      failed: results.filter(r => r.status === 'failed').length,
-      results: results
-    });
+    return res.status(200).json(results);
 
   } catch (error) {
-    console.error('API Error:', error);
-    return res.status(500).json({
-      error: error.message || 'Server error',
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    console.error('Dispatch error:', error);
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error',
+      message: error.message 
     });
   }
 }
 
-/**
- * Format event message for WhatsApp
- */
-function formatEventMessage(event) {
-  const startDate = new Date(event.start_time).toLocaleDateString('en-ZA', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+async function sendWhatsAppMessage(phoneNumber, message) {
+  const whatsappToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   
-  const startTime = new Date(event.start_time).toLocaleTimeString('en-ZA', {
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-
-  return `📅 *EVENT ASSIGNMENT*
-
-🎫 *Event:* ${event.title}
-📅 *Date:* ${startDate}
-🕐 *Time:* ${startTime}
-📍 *Location:* ${event.location || 'TBA'}
-
-Please confirm your availability. Reply YES to accept or NO to decline.
-
-Thank you!
-Fresh People Team`;
-}
-
-/**
- * Send WhatsApp message via Meta Graph API
- */
-async function sendWhatsAppMessage(token, phoneId, to, message) {
-  // Format phone number (remove + and spaces)
-  const formattedPhone = to.replace(/[\s\+\-]/g, '');
-
-  const url = `https://graph.facebook.com/v22.0/${phoneId}/messages`;
-  
-  const payload = {
-    messaging_product: 'whatsapp',
-    to: formattedPhone,
-    type: 'text',
-    text: {
-      body: message
-    }
-  };
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(payload)
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error?.message || 'WhatsApp API error');
+  if (!whatsappToken || !phoneNumberId) {
+    return {
+      success: false,
+      error: 'WhatsApp credentials not configured'
+    };
   }
 
-  return {
-    message_id: data.messages?.[0]?.id,
-    wa_message_id: data.messages?.[0]?.wa_message_id
-  };
+  try {
+    const response = await fetch(`https://graph.facebook.com/v22.0/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${whatsappToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: phoneNumber.replace(/[^\d+]/g, ''), // Clean phone number
+        type: 'text',
+        text: { body: message }
+      })
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.messages?.[0]?.id) {
+      return {
+        success: true,
+        messageId: data.messages[0].id
+      };
+    } else {
+      return {
+        success: false,
+        error: data.error?.message || 'WhatsApp API error'
+      };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
 }

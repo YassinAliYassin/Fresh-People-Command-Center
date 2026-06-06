@@ -1,205 +1,116 @@
-/**
- * ENHANCED TYPE DEFINITIONS FOR AGENT ADVANCED FEATURES
- * Fresh People Command Center - Cycle #4 Enhancements
- */
-
-import { Client } from '../types';
-
-// ==========================================
-// CRM AGENT TYPES
-// ==========================================
-
-export type PipelineStage = 'lead' | 'qualified' | 'proposal' | 'negotiation' | 'closed_won' | 'closed_lost';
-
-export interface PipelineDeal {
-  id: string;
-  clientId: number;
-  clientName: string;
-  stage: PipelineStage;
-  value: number;
-  probability: number;
-  expectedCloseDate: string;
-  assignedTo: string;
-  lastActivity: string;
-  notes: string;
-}
-
-export interface LeadScore {
-  clientId: number;
-  score: number; // 0-100
-  factors: {
-    engagement: number; // 0-100
-    demographics: number; // 0-100
-    behavior: number; // 0-100
-    firmographics: number; // 0-100
-  };
-  trend: 'up' | 'down' | 'stable';
-  lastUpdated: string;
-}
-
-export interface CommunicationRecord {
-  id: string;
-  clientId: number;
-  type: 'email' | 'call' | 'meeting' | 'note' | 'sms';
-  direction: 'inbound' | 'outbound';
-  date: string;
-  subject: string;
-  content: string;
-  duration?: number; // minutes for calls/meetings
-  attendees?: string[];
-  attachments?: string[];
-  outcome?: string;
-}
-
-// ==========================================
-// CALENDAR AGENT TYPES
-// ==========================================
+// Agent types for Fresh People Command Center
 
 export interface CalendarEvent {
   id: string;
   title: string;
-  start: string;
-  end: string;
-  description: string;
-  location: string;
-  attendees: string[];
-  calendarSource: 'google' | 'apple' | 'internal';
-  color: string;
-  recurring?: {
-    frequency: 'daily' | 'weekly' | 'monthly';
-    interval: number;
-    endDate?: string;
-  };
-  reminders: number[]; // minutes before event
-  conflicts?: string[]; // IDs of conflicting events
+  start: Date;
+  end: Date;
+  location?: string;
+  description?: string;
+  staffIds?: number[];
+  clientId?: number;
+  color?: string;
 }
 
 export interface ConflictInfo {
-  eventId: string;
-  conflictingEventIds: string[];
-  conflictType: 'overlap' | 'back_to_back' | 'travel_time';
+  type: 'overlap' | 'double-booking' | 'availability';
   severity: 'low' | 'medium' | 'high';
+  message: string;
+  affectedStaff?: number[];
+  affectedEvents?: string[];
 }
 
-// ==========================================
-// FINANCE AGENT TYPES
-// ==========================================
+export interface CommunicationRecord {
+  id: string;
+  type: 'email' | 'whatsapp' | 'call' | 'meeting';
+  clientId: number;
+  staffId?: number;
+  date: Date;
+  subject: string;
+  content: string;
+  status: 'sent' | 'delivered' | 'read' | 'replied';
+}
 
-export interface Invoice {
+export interface LeadScore {
   id: string;
   clientId: number;
-  clientName: string;
-  invoiceNumber: string;
+  score: number;
+  factors: {
+    engagement: number;
+    budget: number;
+    timeline: number;
+    fit: number;
+  };
+  lastUpdated: Date;
+}
+
+export interface PipelineDeal {
+  id: string;
+  clientId: number;
+  title: string;
+  value: number;
+  stage: PipelineStage;
+  probability: number;
+  expectedCloseDate: Date;
+  notes: string;
+}
+
+export interface PipelineStage {
+  id: string;
+  name: string;
+  order: number;
+  color: string;
+}
+
+export interface Invoice {
+  id: number;
+  docNo: string;
+  clientId: number;
+  eventId?: number;
   issueDate: string;
   dueDate: string;
-  items: InvoiceItem[];
-  subtotal: number;
-  taxRate: number;
-  taxAmount: number;
-  total: number;
-  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled';
-  paymentTerms: number; // days
-  remindersSent: number;
-  lastReminderDate?: string;
-}
-
-export interface InvoiceItem {
-  id: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  total: number;
-}
-
-export interface PaymentReminder {
-  id: string;
-  invoiceId: string;
-  reminderDate: string;
-  reminderType: 'auto' | 'manual';
-  channel: 'email' | 'sms' | 'phone';
-  status: 'scheduled' | 'sent' | 'failed';
-  message: string;
-}
-
-export interface RevenueForecast {
-  month: string;
-  projected: number;
-  actual: number;
-  pipeline: number;
-  confidence: number; // 0-100
-}
-
-// ==========================================
-// OPERATIONS AGENT TYPES
-// ==========================================
-
-export interface StaffMember {
-  id: number;
-  name: string;
-  role: string;
-  email: string;
-  phone: string;
-  status: 'active' | 'inactive' | 'on_leave';
-  availability: AvailabilitySchedule;
-  skills: string[];
-  performanceMetrics: PerformanceMetrics;
-  shiftPreferences: ShiftPreferences;
-}
-
-export interface AvailabilitySchedule {
-  monday: TimeSlot[];
-  tuesday: TimeSlot[];
-  wednesday: TimeSlot[];
-  thursday: TimeSlot[];
-  friday: TimeSlot[];
-  saturday: TimeSlot[];
-  sunday: TimeSlot[];
-}
-
-export interface TimeSlot {
-  start: string; // HH:MM
-  end: string; // HH:MM
-  available: boolean;
-}
-
-export interface ShiftPreferences {
-  preferredDays: string[];
-  preferredHours: string;
-  maxHoursPerWeek: number;
-  unavailableDates: string[];
-}
-
-export interface Shift {
-  id: string;
-  staffId: number;
-  staffName: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  role: string;
-  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled';
+  status: 'draft' | 'sent' | 'paid' | 'overdue';
+  lines: InvoiceItem[];
   notes?: string;
 }
 
-export interface PerformanceMetrics {
-  staffId: number;
-  period: string;
-  hoursWorked: number;
-  eventsCompleted: number;
-  clientSatisfaction: number; // 0-5 rating
-  punctualityRate: number; // percentage
-  tasksCompleted: number;
-  revenueGenerated: number;
+export interface InvoiceItem {
+  desc: string;
+  qty: number;
+  rate: number;
 }
 
-// ==========================================
-// ENHANCED CLIENT TYPE (EXTENDS EXISTING)
-// ==========================================
+export interface Staff {
+  id: number;
+  name: string;
+  role: string;
+  rate: number;
+  pin: string;
+  uniform: boolean;
+  department: string;
+  email: string;
+  phone: string;
+}
 
-export interface EnhancedClient extends Client {
-  pipelineDeals?: PipelineDeal[];
-  leadScore?: LeadScore;
-  communicationHistory?: CommunicationRecord[];
-  taxExempt?: boolean;
-  paymentTerms?: number;
+export interface Client {
+  id: number;
+  name: string;
+  email: string;
+  vatNo: string;
+  address: string;
+  phone: string;
+}
+
+export interface Event {
+  id: number;
+  title: string;
+  date: string;
+  venue: string;
+  staffIds: number[];
+  startTime: string;
+  endTime: string;
+  clientId: number;
+  color: string;
+  gcalId: string | null;
+  notes: string;
 }

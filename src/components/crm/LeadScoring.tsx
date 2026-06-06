@@ -13,7 +13,8 @@ import {
   Info,
   Star,
   ThumbsUp,
-  ThumbsDown
+  ThumbsDown,
+  X
 } from 'lucide-react';
 import { LeadScore } from '../types/agent-types';
 

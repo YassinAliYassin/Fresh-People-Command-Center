@@ -78,7 +78,13 @@ const calcPay = (ms,r) => (!ms||ms<0)?0:(ms/3600000)*r;
 const MONTHS  = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const WDAYS   = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const fmtDate = s => { if(!s) return "—"; const d=new Date(s+"T00:00:00"); return `${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3)} ${d.getFullYear()}`; };
-const eventHours = ev => { const [sh,sm]=ev.startTime.split(":").map(Number),[eh,em]=ev.endTime.split(":").map(Number); return (eh*60+em-sh*60-sm)/60; };
+const eventHours = ev => { 
+  const [sh,sm]=ev.startTime.split(":").map(Number),
+        [eh,em]=ev.endTime.split(":").map(Number); 
+  let minutes = eh*60+em-sh*60-sm;
+  if(minutes < 0) minutes += 24*60; // Overnight event
+  return minutes/60; 
+};
 
 function docSubtotal(lines) { return lines.reduce((a,l)=>a+Number(l.qty)*Number(l.rate),0); }
 function nextDocNo(arr, prefix) { return `${prefix}-${new Date().getFullYear()}-${String(arr.length+1).padStart(3,"0")}`; }
@@ -86,11 +92,12 @@ function nextDocNo(arr, prefix) { return `${prefix}-${new Date().getFullYear()}-
 // ─── Shared UI ────────────────────────────────────────────────────────────────
 function Dot({on,color}){return <span style={{display:"inline-block",width:8,height:8,borderRadius:"50%",background:on?(color||ACCENT):MUTED,boxShadow:on?`0 0 6px ${color||ACCENT}`:"none",flexShrink:0}}/>;}
 function Badge({color,children}){return <span style={{display:"inline-block",padding:"2px 8px",borderRadius:4,fontSize:11,fontWeight:500,background:color+"22",color,border:`1px solid ${color}44`}}>{children}</span>;}
-function Stat({label,value,accent}){
+function Stat({label,value,accent,sub}){
   return(
     <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:10,padding:"14px 18px"}}>
       <div style={{fontSize:11,color:MUTED,marginBottom:6}}>{label}</div>
       <div style={{fontSize:22,fontWeight:600,color:accent||TEXT,fontFamily:"'DM Mono',monospace"}}>{value}</div>
+      {sub && <div style={{fontSize:10,color:MUTED,marginTop:4}}>{sub}</div>}
     </div>
   );
 }
@@ -129,23 +136,41 @@ function Toast({msg,type="success",onDone}){
 
 // ─── OpenRouter API call helper (used inside artifact) ──────────────────────
 async function callClaude(systemPrompt, userPrompt) {
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions",{
-    method:"POST",
-    headers:{
-      "Content-Type":"application/json",
-      "Authorization": `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY}`
-    },
-    body:JSON.stringify({
-      model:"anthropic/claude-sonnet-4",
-      max_tokens:1000,
-      messages:[
-        {role:"system",content:systemPrompt},
-        {role:"user",content:userPrompt}
-      ]
-    })
-  });
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content || "";
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "Authorization": `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY || ''}`
+      },
+      body:JSON.stringify({
+        model:"anthropic/claude-sonnet-4",
+        max_tokens:1000,
+        messages:[
+          {role:"system",content:systemPrompt},
+          {role:"user",content:userPrompt}
+        ]
+      })
+    });
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('OpenRouter API error:', res.status, errorText);
+      return "[Error: API call failed]";
+    }
+    
+    const data = await res.json();
+    
+    if (data.error) {
+      console.error('OpenRouter API error:', data.error);
+      return "[Error: " + (data.error.message || "Unknown error") + "]";
+    }
+    
+    return data.choices?.[0]?.message?.content || "";
+  } catch (e) {
+    console.error('callClaude error:', e);
+    return "[Error: " + e.message + "]";
+  }
 }
 
 // ─── Document Print View (Invoice / Quote / Statement) ───────────────────────
@@ -560,23 +585,32 @@ function CalendarTab({events,setEvents,staff,clients,addToast}){
 
   // Fetch GCal events for the visible month
   // Fetch Google Calendar events (client-side, no API route needed)
-  async function fetchGcal(){
+  async function fetchGcal() {
     setSyncing(true);
     try{
-      // Fetch iCal feed directly from Google Calendar
-      const icalUrl = 'https://calendar.google.com/calendar/ical/gq7gjllsghrfgr8ijgqvrbdijbu1i2ka%40import.calendar.google.com/public/basic.ics';
+      // Use local API endpoint instead of direct iCal fetch
+      const resp = await fetch('/api/calendar/google');
+      if (!resp.ok) {
+        const errorData = await resp.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to fetch Google Calendar');
+      }
       
-      const resp = await fetch(icalUrl);
-      if (!resp.ok) throw new Error('Failed to fetch iCal');
+      const data = await resp.json();
       
-      const icalData = await resp.text();
-      const events = parseICal(icalData);
-      
-      setGcalEvents(events.map(e=>({...e, isGcal:true, color:"#5ca4ea"})));
-      addToast(`Google Calendar synced ✓ (${events.length} events)`,"success");
-    }catch(e){ 
+      if (data.success && Array.isArray(data.events)) {
+        setGcalEvents(data.events.map(e => ({
+          ...e,
+          isGcal: true,
+          color: "#5ca4ea",
+          date: e.start.split('T')[0] // Extract date part
+        })));
+        addToast(`Google Calendar synced ✓ (${data.events.length} events)`, "success");
+      } else {
+        throw new Error('Invalid response format');
+      }
+    } catch(e){ 
       console.error('GCal sync error:', e);
-      addToast("Could not fetch Google Calendar","error"); 
+      addToast(`Google Calendar sync failed: ${e.message}`, "error"); 
     }
     setSyncing(false);
   }
@@ -702,30 +736,23 @@ Pay: R${s.total} (R${s.rate}/h)
 Notes: ${ev.notes||"N/A"}
 Sign off from: Freshpeople Admin`
         );
+        
+        // For now, copy to clipboard as Gmail draft creation requires OAuth2 setup
+        const emailContent = `To: ${s.email}
+Subject: Booking Confirmed: ${ev.title} — ${fmtDate(ev.date)}
 
-        // Create Gmail draft via OpenRouter
-        await fetch("https://openrouter.ai/api/v1/chat/completions",{
-          method:"POST",
-          headers:{
-            "Content-Type":"application/json",
-            "Authorization": `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY}`
-          },
-          body:JSON.stringify({
-            model:"anthropic/claude-sonnet-4",
-            max_tokens:200,
-            messages:[
-              {role:"system",content:"Create the Gmail draft as instructed. Confirm with: Draft created."},
-              {role:"user",content:`Create a Gmail draft email to: ${s.email}, subject: "Booking Confirmed: ${ev.title} — ${fmtDate(ev.date)}", body: ${JSON.stringify(body)}`}
-            ],
-            mcp_servers:[{type:"url",url:"https://gmailmcp.googleapis.com/mcp/v1",name:"gmail"}]
-          })
-        });
+${body}`;
+        
+        await navigator.clipboard.writeText(emailContent);
         successCount++;
       }catch(e){}
     }
     setSendingNotifs(false);
     setBookingModal(null);
-    addToast(`${successCount}/${staffToNotify.length} booking emails drafted in Gmail ✓`,"success");
+    addToast(`${successCount}/${staffToNotify.length} booking emails generated & copied to clipboard ✓`,"success");
+    if(successCount > 0) {
+      addToast("Paste from clipboard into Gmail to send","warn");
+    }
   }
 
   function openNew(day){
@@ -1017,7 +1044,7 @@ export default function App(){
   const [page,setPage]           = useState("login");
   const [currentStaff,setCS]     = useState(null);
   const [isAdmin,setIsAdmin]     = useState(false);
-  const [staff]                  = useState(INITIAL_STAFF);
+  const [staff,setStaff]      = useState(INITIAL_STAFF);
   const [records,setRecords]     = useState([]);
   const [now,setNow]             = useState(Date.now());
   const [adminTab,setAdminTab]   = useState("dashboard");
@@ -1027,6 +1054,7 @@ export default function App(){
   const [clients]                = useState(INITIAL_CLIENTS);
   const [toasts,setToasts]       = useState([]);
   const [newStaff,setNewStaff]   = useState({name:"",role:"",rate:"",pin:"",department:"Bar",uniform:false,email:"",phone:""});
+  const [editingStaffId,setEditingStaffId] = useState(null);
 
   useEffect(()=>{ const t=setInterval(()=>setNow(Date.now()),10000); return()=>clearInterval(t); },[]);
 
@@ -1053,7 +1081,7 @@ export default function App(){
   const tHours      = completed.reduce((a,r)=>a+(r.clockOut-r.clockIn)/3600000,0);
   const tActive     = staff.filter(s=>records.some(r=>r.staffId===s.id&&!r.clockOut)).length;
 
-  const TABS=[["dashboard","Dashboard"],["roster","Roster"],["timesheets","Timesheets"],["calendar","Calendar"],["documents","Docs & Billing"],["add staff","Add Staff"]];
+  const TABS=[["dashboard","Dashboard"],["roster","Roster"],["timesheets","Timesheets"],["calendar","Calendar"],["documents","Docs & Billing"],["clients","Clients"],["payroll","Payroll"],["add staff","Add Staff"]];
 
   return(
     <>
@@ -1155,8 +1183,191 @@ export default function App(){
             </div>
 
             {/* DASHBOARD */}
-            {/* DASHBOARD - Executive Intelligence Agent */}
-            {adminTab==="dashboard"&&<Dashboard staff={staff} events={events} clients={clients} records={records} now={now} addToast={addToast}/>}
+            {/* DASHBOARD - Clean & Modern */}
+            {adminTab==="dashboard"&&(
+              <div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:24,marginBottom:24}}>
+                  {/* Main Content */}
+                  <div>
+                    {/* Today's Events */}
+                    <div style={{marginBottom:24}}>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+                        <h2 style={{fontSize:20,fontWeight:600,color:TEXT,margin:0}}>Today's Events</h2>
+                        <Btn variant="primary" onClick={()=>setAdminTab("calendar")} style={{fontSize:12}}>+ New Event</Btn>
+                      </div>
+                      
+                      {todayEvents.length === 0 ? (
+                        <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:12,padding:"32px 24px",textAlign:"center"}}>
+                          <div style={{fontSize:48,marginBottom:8}}>📅</div>
+                          <div style={{color:MUTED,fontSize:14}}>No events scheduled for today</div>
+                        </div>
+                      ) : (
+                        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                          {todayEvents.map(e => {
+                            const client = clients.find(c => c.id === e.clientId);
+                            const assignedStaff = staff.filter(s => e.staffIds?.includes(s.id));
+                            return (
+                              <div key={e.id} style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:12,padding:"20px 24px"}}>
+                                <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
+                                  <div style={{flex:1}}>
+                                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                                      <div style={{width:8,height:8,borderRadius:"50%",background:e.color||ACCENT}}/>
+                                      <h3 style={{fontSize:16,fontWeight:600,color:TEXT,margin:0}}>{e.title}</h3>
+                                    </div>
+                                    
+                                    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16,marginBottom:12,fontSize:13,color:MUTED}}>
+                                      <div>📍 {e.venue}</div>
+                                      <div>⏰ {e.startTime} - {e.endTime}</div>
+                                      <div>👤 {client?.name || "Unknown Client"}</div>
+                                    </div>
+                                    
+                                    {assignedStaff.length > 0 && (
+                                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                                        <span style={{fontSize:12,color:MUTED}}>Staff:</span>
+                                        {assignedStaff.map(s => (
+                                          <Badge key={s.id} color={ACCENT}>{s.name}</Badge>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  <div style={{display:"flex",alignItems:"center",gap:8,marginLeft:16}}>
+                                    <Btn variant="accent" onClick={async ()=>{
+                                      try {
+                                        const response = await fetch('/api/dispatch-staff', {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ eventId: e.id, staffIds: e.staffIds })
+                                        });
+                                        const result = await response.json();
+                                        if (result.success) {
+                                          addToast(`WhatsApp sent to ${result.dispatched} staff members`, 'success');
+                                        } else {
+                                          addToast('Failed to send WhatsApp notifications', 'error');
+                                        }
+                                      } catch (err) {
+                                        addToast('Network error sending notifications', 'error');
+                                      }
+                                    }} style={{fontSize:12,padding:"6px 12px"}}>
+                                      📤 Notify Staff
+                                    </Btn>
+                                    <Btn variant="ghost" onClick={()=>{setAdminTab("calendar")}} style={{fontSize:12,padding:"6px 8px"}}>✏️</Btn>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Quick Actions */}
+                    <div style={{marginBottom:24}}>
+                      <h3 style={{fontSize:16,fontWeight:600,color:TEXT,marginBottom:16}}>Quick Actions</h3>
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
+                        <button onClick={()=>setAdminTab("calendar")} style={{
+                          background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:12,padding:"20px 16px",
+                          display:"flex",flexDirection:"column",alignItems:"center",gap:8,
+                          transition:"all 0.2s",cursor:"pointer",color:"inherit"
+                        }}>
+                          <div style={{fontSize:24}}>📅</div>
+                          <div style={{fontSize:13,fontWeight:500,color:TEXT}}>Create Event</div>
+                        </button>
+                        
+                        <button onClick={()=>setAdminTab("add staff")} style={{
+                          background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:12,padding:"20px 16px",
+                          display:"flex",flexDirection:"column",alignItems:"center",gap:8,
+                          transition:"all 0.2s",cursor:"pointer",color:"inherit"
+                        }}>
+                          <div style={{fontSize:24}}>👥</div>
+                          <div style={{fontSize:13,fontWeight:500,color:TEXT}}>Add Staff</div>
+                        </button>
+                        
+                        <button onClick={async ()=>{
+                          const todayStaffIds = todayEvents.flatMap(e => e.staffIds || []);
+                          if (todayStaffIds.length === 0) {
+                            addToast('No staff assigned to today\'s events', 'warning');
+                            return;
+                          }
+                          try {
+                            for (const event of todayEvents) {
+                              if (event.staffIds?.length > 0) {
+                                await fetch('/api/dispatch-staff', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ eventId: event.id, staffIds: event.staffIds })
+                                });
+                              }
+                            }
+                            addToast('Bulk WhatsApp dispatch completed', 'success');
+                          } catch (err) {
+                            addToast('Bulk dispatch failed', 'error');
+                          }
+                        }} style={{
+                          background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:12,padding:"20px 16px",
+                          display:"flex",flexDirection:"column",alignItems:"center",gap:8,
+                          transition:"all 0.2s",cursor:"pointer",color:"inherit"
+                        }}>
+                          <div style={{fontSize:24}}>📤</div>
+                          <div style={{fontSize:13,fontWeight:500,color:TEXT}}>Bulk Dispatch</div>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Sidebar */}
+                  <div>
+                    {/* Staff Status */}
+                    <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:12,padding:"20px 24px",marginBottom:16}}>
+                      <h3 style={{fontSize:16,fontWeight:600,color:TEXT,marginBottom:16}}>Staff Status</h3>
+                      
+                      <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            <div style={{width:8,height:8,borderRadius:"50%",background:"#10b981"}}/>
+                            <span style={{fontSize:13,color:TEXT}}>Available</span>
+                          </div>
+                          <span style={{fontSize:14,fontWeight:600,color:"#10b981"}}>{staff.length - todayEvents.flatMap(e => e.staffIds || []).length}</span>
+                        </div>
+                        
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            <div style={{width:8,height:8,borderRadius:"50%",background:AMBER}}/>
+                            <span style={{fontSize:13,color:TEXT}}>On Assignment</span>
+                          </div>
+                          <span style={{fontSize:14,fontWeight:600,color:AMBER}}>{todayEvents.flatMap(e => e.staffIds || []).length}</span>
+                        </div>
+                        
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            <div style={{width:8,height:8,borderRadius:"50%",background:RED}}/>
+                            <span style={{fontSize:13,color:TEXT}}>Total Staff</span>
+                          </div>
+                          <span style={{fontSize:14,fontWeight:600,color:TEXT}}>{staff.length}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Recent Bookings */}
+                    <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:12,padding:"20px 24px"}}>
+                      <h3 style={{fontSize:16,fontWeight:600,color:TEXT,marginBottom:16}}>Upcoming Events</h3>
+                      
+                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                        {events.filter(e => new Date(e.date) > new Date()).slice(0,4).map((event) => (
+                          <div key={event.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0"}}>
+                            <div style={{width:6,height:6,borderRadius:"50%",background:event.color||ACCENT}}/>
+                            <div style={{flex:1}}>
+                              <div style={{fontSize:12,color:TEXT}}>{event.title}</div>
+                              <div style={{fontSize:10,color:MUTED}}>{new Date(event.date).toLocaleDateString()} - {event.startTime}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* CLIENTS - CRM Agent */}
             {adminTab==="clients"&&<ClientsView clients={clients} events={events} addToast={addToast}/>}
@@ -1178,10 +1389,12 @@ export default function App(){
                         onView={()=>alert(s.name)}
                         onEdit={()=>{
                           setNewStaff({name:s.name,role:s.role,rate:String(s.rate),pin:s.pin,department:s.department,uniform:s.uniform,email:s.email,phone:s.phone});
+                          setEditingStaffId(s.id);
                           setAdminTab("add staff");
                         }}
                         onRemove={()=>{
-                          if(window.confirm("Remove?")){
+                          if(window.confirm(`Remove ${s.name}?`)){
+                            setStaff(prev=>prev.filter(x=>x.id!==s.id));
                             addToast(s.name+" removed","success");
                           }
                         }}
@@ -1261,7 +1474,21 @@ export default function App(){
                     <input type="checkbox" checked={newStaff.uniform} onChange={e=>setNewStaff(p=>({...p,uniform:e.target.checked}))} style={{width:16,height:16}}/>
                     <span style={{fontSize:13,color:MUTED}}>Requires uniform</span>
                   </div>
-                  <Btn variant="primary" onClick={()=>{ if(!newStaff.name||!newStaff.pin||!newStaff.rate) return; addToast(`${newStaff.name} added to roster`,"success"); setNewStaff({name:"",role:"",rate:"",pin:"",department:"Bar",uniform:false,email:"",phone:""}); }} style={{padding:"12px 24px",fontSize:14}}>Add Staff Member</Btn>
+                  <Btn variant="primary" onClick={()=>{ 
+                    if(!newStaff.name||!newStaff.pin||!newStaff.rate) return; 
+                    if(editingStaffId) {
+                      // Update existing staff
+                      setStaff(prev=>prev.map(s=>s.id===editingStaffId?{...s,...newStaff,rate:Number(newStaff.rate),uniform:newStaff.uniform}:s));
+                      addToast(`${newStaff.name} updated`,"success");
+                      setEditingStaffId(null);
+                    } else {
+                      // Add new staff
+                      const newId = Math.max(...staff.map(s=>s.id)) + 1;
+                      setStaff(prev=>[...prev,{...newStaff,id:newId,rate:Number(newStaff.rate),uniform:newStaff.uniform}]);
+                      addToast(`${newStaff.name} added to roster`,"success");
+                    }
+                    setNewStaff({name:"",role:"",rate:"",pin:"",department:"Bar",uniform:false,email:"",phone:""}); 
+                  }} style={{padding:"12px 24px",fontSize:14}}>{editingStaffId?"Update Staff Member":"Add Staff Member"}</Btn>
                 </div>
               </div>
             )}

@@ -17,7 +17,8 @@ import {
   X,
   ChevronDown,
   ChevronUp,
-  User
+  User,
+  Plus
 } from 'lucide-react';
 import { CommunicationRecord } from '../types/agent-types';
 
