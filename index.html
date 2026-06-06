@@ -98,19 +98,30 @@
       }
       
       /* Text Truncation to prevent line breaking from blowing out card geometry */
-      .truncate-text {
-        white-space: nowrap;
+      /* Text Truncation to prevent line breaking from blowing out card geometry */
+      .text-truncate-mobile {
         overflow: hidden;
         text-overflow: ellipsis;
-        max-width: 100%;
+        white-space: nowrap;
+      }
+      
+      /* Touch target optimization for mobile */
+      button, [role="button"], .btn-action {
+        min-height: 44px;
+        min-width: 44px;
+      }
+      
+      /* Prevent zoom on inputs - iOS fix */
+      input[type="text"], input[type="email"], input[type="tel"], textarea, select {
+        font-size: 16px !important;
       }
     }
   </style>
-  </head>
-  <body class="bg-[#050507] min-h-screen text-slate-200 antialiased overflow-x-hidden">
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
 </html>
 
 
