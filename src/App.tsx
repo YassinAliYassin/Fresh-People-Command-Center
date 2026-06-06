@@ -1049,6 +1049,8 @@ export default function App(){
   const [now,setNow]             = useState(Date.now());
   const [adminTab,setAdminTab]   = useState("dashboard");
   const [events,setEvents]       = useState(INITIAL_EVENTS);
+  const todayStr = ymd(today);
+  const todayEvents = events.filter(e => e.date === todayStr);
   const [invoices,setInvoices]   = useState(INITIAL_INVOICES);
   const [quotes,setQuotes]       = useState(INITIAL_QUOTES);
   const [clients]                = useState(INITIAL_CLIENTS);
