@@ -19,6 +19,13 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
       // SPA fallback for React Router client-side routes
       historyApiFallback: true,
+      // Proxy API requests to Express backend
+      proxy: {
+        '/api': {
+          target: 'http://localhost:3001',
+          changeOrigin: true,
+        }
+      }
     },
     // Preview server fallback for production builds
     preview: {
