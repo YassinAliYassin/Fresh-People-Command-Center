@@ -1,7 +1,8 @@
-// WhatsApp Staff Dispatch API
+// WhatsApp Staff Dispatch API - Enhanced with better validation
 // Sends booking notifications via WhatsApp Business API
 
 export default async function handler(req, res) {
+  // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -9,18 +10,45 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ 
+      success: false,
+      error: 'Method not allowed',
+      dispatched: 0 
+    });
   }
 
   try {
     const { eventId, staffIds } = req.body;
     
-    if (!eventId || !Array.isArray(staffIds)) {
-      return res.status(400).json({ error: 'eventId and staffIds array required' });
+    // Validate input
+    if (!eventId || typeof eventId !== 'number') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Valid eventId (number) required',
+        dispatched: 0 
+      });
+    }
+    
+    if (!Array.isArray(staffIds) || staffIds.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'staffIds must be a non-empty array',
+        dispatched: 0 
+      });
+    }
+    
+    // Validate all staffIds are numbers
+    if (!staffIds.every(id => typeof id === 'number')) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'All staffIds must be numbers',
+        dispatched: 0 
+      });
     }
 
-    // Mock event and staff data for now - in production this would come from database
+    // Mock event and staff data - in production, fetch from database
     const mockEvent = {
+      id: eventId,
       title: "Corporate Gala - MTN",
       date: "June 15, 2026", 
       time: "6:00 PM - 11:00 PM",
@@ -109,13 +137,14 @@ www.fresh-people.co.za`;
     }
 
     return res.status(200).json(results);
-
+    
   } catch (error) {
     console.error('Dispatch error:', error);
     return res.status(500).json({ 
       success: false, 
       error: 'Internal server error',
-      message: error.message 
+      message: error.message,
+      dispatched: 0 
     });
   }
 }
