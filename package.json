@@ -22,7 +22,7 @@
     "date-fns-tz": "^3.2.0",
     "dav": "^1.8.0",
     "dotenv": "^17.4.2",
-    "express": "^4.21.2",
+    "express": "^4.22.2",
     "firebase": "^12.13.0",
     "google-auth-library": "^10.6.2",
     "googleapis": "^173.0.0",
