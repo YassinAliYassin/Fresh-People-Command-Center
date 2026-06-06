@@ -88,6 +88,25 @@ export class FPCCCore {
     }
   }
 
+  // Run expert panel (test connectivity)
+  static async runPanel(config: { title: string; description: string }): Promise<string> {
+    try {
+      console.log(`🎯 Running panel: ${config.title}`);
+      console.log(`📋 Description: ${config.description}`);
+      
+      // Test Apple Calendar connection
+      const appleTest = await this.syncAppleCalendar();
+      
+      if (appleTest.success) {
+        return `✅ Panel is active and fully operational.\n\nApple Calendar: Connected (${appleTest.count} events found)`;
+      } else {
+        return `⚠️ Panel active. Apple Calendar: ${appleTest.error || 'Connection issue'}`;
+      }
+    } catch (error) {
+      return `❌ Panel error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    }
+  }
+
   // Sync Google Calendar
   static async syncGoogleCalendar(): Promise<AppleCalendarResult> {
     try {
