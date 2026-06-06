@@ -3,6 +3,7 @@ import ClientsView from './components/ClientsView';
 import Dashboard from './components/Dashboard';
 import Payroll from './pages/Payroll';
 import StaffCard from './components/StaffCard';
+import { FPCCCore } from './services/fpcc-core';
 
 // ─── Constants & Seed ────────────────────────────────────────────────────────
 const INITIAL_STAFF = [
@@ -1270,14 +1271,16 @@ export default function App(){
                                   <div style={{display:"flex",alignItems:"center",gap:8,marginLeft:16}}>
                                     <Btn variant="accent" onClick={async ()=>{
                                       try {
-                                        const response = await fetch('/api/dispatch-staff', {
-                                          method: 'POST',
-                                          headers: { 'Content-Type': 'application/json' },
-                                          body: JSON.stringify({ eventId: e.id, staffIds: e.staffIds })
+                                        const result = await FPCCCore.sendWhatsApp('', {
+                                          type: 'dispatch',
+                                          clientName: getClientName(e.clientId),
+                                          dateTime: `${e.date} ${e.startTime}`,
+                                          uniformType: 'Formal All Black',
+                                          staffName: e.staffIds?.map(id => STAFF.find(s => s.id === id)?.name).join(', ')
                                         });
-                                        const result = await response.json();
+                                        
                                         if (result.success) {
-                                          addToast(`WhatsApp sent to ${result.dispatched} staff members`, 'success');
+                                          addToast(`WhatsApp sent successfully`, 'success');
                                         } else {
                                           addToast('Failed to send WhatsApp notifications', 'error');
                                         }
