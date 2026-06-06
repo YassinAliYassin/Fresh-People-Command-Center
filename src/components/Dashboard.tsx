@@ -75,57 +75,57 @@ const Dashboard: React.FC<{
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-6">
+    <div className="min-h-screen bg-gray-50 text-gray-900 p-6">
       <div className="max-w-6xl mx-auto">
-        {/* Simple Header */}
+        {/* Clean Header */}
         <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gold-400">Dashboard</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
           <button 
             onClick={refresh}
-            className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
+            className="p-2 rounded-lg bg-white hover:bg-gray-100 border border-gray-200 transition-colors shadow-sm"
             title="Refresh"
           >
-            <RefreshCw size={18} className={`text-gold-400 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw size={18} className={`text-blue-600 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
         </div>
 
-        {/* KPI Cards - Simplified */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        {/* Clean KPI Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {[
-            { label: 'Staff', value: staff.length, icon: <Users size={20} />, color: 'text-blue-400' },
-            { label: 'Today', value: todayEvents.length, icon: <MapPin size={20} />, color: 'text-green-400' },
-            { label: 'Active', value: activeStaff, icon: <Users size={20} />, color: 'text-gold-400' },
-            { label: 'Payroll', value: `R${totalPayroll.toFixed(0)}`, icon: <DollarSign size={20} />, color: 'text-emerald-400' }
+            { label: 'Total Staff', value: staff.length, icon: <Users size={20} />, color: 'text-blue-600', bg: 'bg-blue-50' },
+            { label: "Today's Events", value: todayEvents.length, icon: <MapPin size={20} />, color: 'text-green-600', bg: 'bg-green-50' },
+            { label: 'Active Staff', value: activeStaff, icon: <Users size={20} />, color: 'text-purple-600', bg: 'bg-purple-50' },
+            { label: 'Total Payroll', value: `R${totalPayroll.toFixed(0)}`, icon: <DollarSign size={20} />, color: 'text-emerald-600', bg: 'bg-emerald-50' }
           ].map((kpi, i) => (
-            <div key={i} className="bg-gray-900/60 border border-gray-700/50 rounded-2xl p-5 hover:border-gold-500/30 transition-all">
+            <div key={i} className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md transition-all">
               <div className="flex items-center justify-between mb-3">
-                <div className={`p-2 rounded-xl bg-gray-800/50 ${kpi.color}`}>
+                <div className={`p-2 rounded-lg ${kpi.bg} ${kpi.color}`}>
                   {kpi.icon}
                 </div>
               </div>
-              <p className="text-sm text-gray-400 mb-1">{kpi.label}</p>
-              <p className="text-2xl font-bold text-white">{kpi.value}</p>
+              <p className="text-sm text-gray-500 mb-1">{kpi.label}</p>
+              <p className="text-2xl font-bold text-gray-900">{kpi.value}</p>
             </div>
           ))}
         </div>
 
         {/* Two Column Layout */}
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Today's Events */}
-          <div className="bg-gray-900/60 border border-gray-700/50 rounded-2xl p-5">
-            <h3 className="text-lg font-semibold mb-4">Today</h3>
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900">Today's Events</h3>
             {todayEvents.length === 0 ? (
-              <p className="text-gray-500 text-sm">No events</p>
+              <p className="text-gray-400 text-sm">No events today</p>
             ) : (
               <div className="space-y-3">
                 {todayEvents.slice(0, 5).map(ev => (
-                  <div key={ev.id} className="flex items-start gap-3 p-3 bg-gray-800/30 rounded-lg">
+                  <div key={ev.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                     <div className={`w-2 h-2 rounded-full mt-1.5 ${
-                      ev.status === 'Confirmed' ? 'bg-green-400' : 'bg-yellow-400'
+                      ev.status === 'Confirmed' ? 'bg-green-500' : 'bg-yellow-500'
                     }`} />
                     <div className="flex-1">
-                      <p className="text-sm font-medium">{ev.title}</p>
-                      <p className="text-xs text-gray-400">{ev.startTime} - {ev.endTime}</p>
+                      <p className="text-sm font-medium text-gray-900">{ev.title}</p>
+                      <p className="text-xs text-gray-500">{ev.startTime} - {ev.endTime}</p>
                     </div>
                   </div>
                 ))}
@@ -134,21 +134,25 @@ const Dashboard: React.FC<{
           </div>
 
           {/* Quick Stats */}
-          <div className="bg-gray-900/60 border border-gray-700/50 rounded-2xl p-5">
-            <h3 className="text-lg font-semibold mb-4">Stats</h3>
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900">Quick Stats</h3>
             <div className="space-y-4">
               <div>
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-400">Confirmed</span>
-                  <span className="text-green-400">{confirmedToday}</span>
+                  <span className="text-gray-500">Confirmed Today</span>
+                  <span className="text-green-600 font-medium">{confirmedToday}</span>
                 </div>
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-400">Pending</span>
-                  <span className="text-yellow-400">{pendingToday}</span>
+                  <span className="text-gray-500">Pending Today</span>
+                  <span className="text-yellow-600 font-medium">{pendingToday}</span>
                 </div>
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-400">Hours</span>
-                  <span className="text-gold-400">{totalHours.toFixed(1)}h</span>
+                  <span className="text-gray-500">Total Hours</span>
+                  <span className="text-blue-600 font-medium">{totalHours.toFixed(1)}h</span>
+                </div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-gray-500">Active Staff</span>
+                  <span className="text-purple-600 font-medium">{activeStaff}</span>
                 </div>
               </div>
             </div>
@@ -156,8 +160,8 @@ const Dashboard: React.FC<{
         </div>
 
         {/* Last Refresh */}
-        <div className="mt-6 text-xs text-gray-600 text-right">
-          {lastRefresh.toLocaleTimeString()}
+        <div className="mt-6 text-xs text-gray-400 text-right">
+          Last updated: {lastRefresh.toLocaleTimeString()}
         </div>
       </div>
     </div>

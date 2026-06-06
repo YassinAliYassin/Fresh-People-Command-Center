@@ -4,6 +4,7 @@ import Dashboard from './components/Dashboard';
 import Payroll from './pages/Payroll';
 import StaffCard from './components/StaffCard';
 import { FPCCCore } from './services/fpcc-core';
+import ModelPanel from './components/ModelPanel';
 
 // ─── Constants & Seed ────────────────────────────────────────────────────────
 const INITIAL_STAFF = [
@@ -136,8 +137,9 @@ function Toast({msg,type="success",onDone}){
 }
 
 // ─── OpenRouter API call helper (used inside artifact) ──────────────────────
-async function callClaude(systemPrompt, userPrompt) {
+async function callClaude(systemPrompt, userPrompt, modelOverride = null) {
   try {
+    const model = modelOverride || "deepseek/deepseek-chat-v3-0324:free";
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions",{
       method:"POST",
       headers:{
@@ -145,7 +147,7 @@ async function callClaude(systemPrompt, userPrompt) {
         "Authorization": `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY || ''}`
       },
       body:JSON.stringify({
-        model:"anthropic/claude-sonnet-4",
+        model: model,
         max_tokens:1000,
         messages:[
           {role:"system",content:systemPrompt},
@@ -763,7 +765,8 @@ Venue: ${ev.venue||"TBC"}
 Hours: ${hrs}h
 Pay: R${s.total} (R${s.rate}/h)
 Notes: ${ev.notes||"N/A"}
-Sign off from: Freshpeople Admin`
+Sign off from: Freshpeople Admin`,
+          currentModel
         );
         
         // For now, copy to clipboard as Gmail draft creation requires OAuth2 setup
@@ -1092,8 +1095,25 @@ export default function App(){
   const [toasts,setToasts]       = useState([]);
   const [newStaff,setNewStaff]   = useState({name:"",role:"",rate:"",pin:"",department:"Bar",uniform:false,email:"",phone:""});
   const [editingStaffId,setEditingStaffId] = useState(null);
+  const [currentModel,setCurrentModel] = useState('deepseek/deepseek-chat-v3-0324:free');
+  const [currentTask,setCurrentTask] = useState('default');
 
   useEffect(()=>{ const t=setInterval(()=>setNow(Date.now()),10000); return()=>clearInterval(t); },[]);
+
+  // Task detection for model rotation
+  useEffect(() => {
+    const taskMapping = {
+      'dashboard': 'data-analysis',
+      'roster': 'staff-scheduling',
+      'timesheets': 'payroll-calculation',
+      'calendar': 'event-planning',
+      'documents': 'invoice-generation',
+      'clients': 'client-communication',
+      'payroll': 'payroll-calculation',
+      'add staff': 'staff-scheduling'
+    };
+    setCurrentTask(taskMapping[adminTab] || 'default');
+  }, [adminTab]);
 
   const addToast = useCallback((msg,type="success")=>{
     const id=Date.now();
@@ -1141,6 +1161,7 @@ export default function App(){
           </div>
         )}
         <div style={{color:MUTED,fontSize:12,fontFamily:"'DM Mono',monospace"}}>{new Date(now).toLocaleTimeString("en-ZA",{hour:"2-digit",minute:"2-digit"})}</div>
+        <ModelPanel currentTask={currentTask} onModelSelect={(modelId) => setCurrentModel(modelId)} />
       </div>
 
       <div style={{maxWidth:1080,margin:"0 auto",padding:"32px 20px"}}>

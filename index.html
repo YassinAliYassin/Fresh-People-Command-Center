@@ -116,6 +116,162 @@
         font-size: 16px !important;
       }
     }
+    /* CLEAN MODERN DASHBOARD DESIGN - OVERRIDE */
+    body {
+      background: #f8fafc !important;
+      font-family: 'DM Mono', 'Outfit', -apple-system, sans-serif !important;
+    }
+    
+    /* Clean header */
+    header {
+      background: white !important;
+      border-bottom: 1px solid #e2e8f0 !important;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+    }
+    
+    /* Clean cards and containers */
+    div[class*="bg-white"], .bg-white {
+      background: white !important;
+      border-radius: 12px !important;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+      border: 1px solid #e2e8f0 !important;
+    }
+    
+    /* Clean typography */
+    h1, h2, h3, h4 {
+      color: #1e293b !important;
+      font-weight: 600 !important;
+      letter-spacing: -0.025em !important;
+    }
+    
+    /* Clean buttons */
+    button {
+      border-radius: 8px !important;
+      font-weight: 500 !important;
+      transition: all 0.2s ease !important;
+    }
+    
+    button:hover {
+      transform: translateY(-1px) !important;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
+    }
+    
+    /* Clean inputs */
+    input, select, textarea {
+      border-radius: 8px !important;
+      border: 1px solid #d1d5db !important;
+      padding: 8px 12px !important;
+      font-size: 14px !important;
+    }
+    
+    input:focus, select:focus, textarea:focus {
+      border-color: #3b82f6 !important;
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.1) !important;
+      outline: none !important;
+    }
+    
+    /* Clean tables */
+    table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+    }
+    
+    th {
+      background: #f8fafc !important;
+      font-weight: 600 !important;
+      text-align: left !important;
+      padding: 12px !important;
+      border-bottom: 2px solid #e2e8f0 !important;
+    }
+    
+    td {
+      padding: 12px !important;
+      border-bottom: 1px solid #f1f5f9 !important;
+    }
+    
+    tr:hover {
+      background: #f8fafc !important;
+    }
+    
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+      .grid {
+        grid-template-columns: 1fr !important;
+      }
+      
+      header h1 {
+        font-size: 1.25rem !important;
+      }
+      
+      button {
+        width: 100% !important;
+        margin-bottom: 8px !important;
+      }
+    }
+    
+    /* Stat cards */
+    .stat-card {
+      background: white !important;
+      border-radius: 12px !important;
+      padding: 20px !important;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+      border: 1px solid #e2e8f0 !important;
+    }
+    
+    /* Modal overlay */
+    .modal-overlay {
+      background: rgba(0,0,0,0.5) !important;
+      backdrop-filter: blur(4px) !important;
+    }
+    
+    .modal-content {
+      background: white !important;
+      border-radius: 16px !important;
+      box-shadow: 0 20px 25px rgba(0,0,0,0.15) !important;
+    }
+    /* FORCE CLEAN DESIGN FOR ALL COMPONENTS */
+    /* Override any dark theme classes */
+    .bg-gray-900, .bg-gray-800, .bg-gray-950, .bg-gray-850 {
+      background: white !important;
+      color: #1e293b !important;
+    }
+    
+    .bg-gray-900\/60, .bg-gray-800\/30, .bg-gray-800\/50 {
+      background: white !important;
+      color: #1e293b !important;
+    }
+    
+    .text-white {
+      color: #1e293b !important;
+    }
+    
+    .text-gray-400 {
+      color: #94a3b8 !important;
+    }
+    
+    .border-gray-700, .border-gray-700\/50 {
+      border-color: #e2e8f0 !important;
+    }
+    
+    /* Force all cards to be white with subtle shadows */
+    div[class*="rounded-2xl"], div[class*="rounded-xl"] {
+      background: white !important;
+      border: 1px solid #e2e8f0 !important;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+    }
+    
+    /* Force all headers to be clean */
+    h1, h2, h3, h4 {
+      color: #1e293b !important;
+      font-weight: 600 !important;
+    }
+    
+    /* Force all buttons to be clean */
+    button {
+      border-radius: 8px !important;
+      font-weight: 500 !important;
+      transition: all 0.2s ease !important;
+    }
   </style>
 </head>
 <body>
