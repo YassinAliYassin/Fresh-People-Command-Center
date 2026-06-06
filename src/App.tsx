@@ -621,17 +621,20 @@ function CalendarTab({events,setEvents,staff,clients,addToast}){
   async function fetchApple() {
     setSyncingApple(true);
     try {
-      const resp = await fetch('/api/calendar');
-      if (!resp.ok) throw new Error('Failed to fetch calendar');
+      // Fetch iCloud calendar directly
+      const iCloudUrl = process.env.REACT_APP_ICLOUD_URL || 'https://p56-caldav.icloud.com/published/2/MjA3NTMxODM0NzYyMDc1M_MJWBML9PYYcak11gdiRE00jIWbogtgWyD9NtdzTpGoU6oXGhtZYzSDjGnia66w7NxkexZbSwm_tUVl14qv7-g';
+      const resp = await fetch(iCloudUrl);
+      if (!resp.ok) throw new Error('Failed to fetch iCloud calendar');
       
-      const data = await resp.json();
-      const appleEvents = data.icloud || [];
-      
-      setAppleEvents(appleEvents.map(e => ({
+      const icsText = await resp.text();
+      const appleEvents = parseICal(icsText).map(e => ({
         ...e,
         isApple: true,
-        color: "#FF9500"
-      })));
+        color: "#FF9500",
+        date: (e.start || '').split('T')[0]
+      }));
+      
+      setAppleEvents(appleEvents);
       addToast(`Apple Calendar synced ✓ (${appleEvents.length} events)`, "success");
     } catch(e) {
       console.error('Apple sync error:', e);
