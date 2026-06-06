@@ -3,21 +3,12 @@ export class FPCCCore {
   private static baseURL = window.location.origin;
 
   // Send WhatsApp notification via backend API
-  static async sendWhatsApp(phone: string, payload: {
-    type: 'booking' | 'dispatch' | 'reminder';
-    clientName: string;
-    dateTime: string;
-    uniformType?: string;
-    staffName?: string;
-  }): Promise<{ success: boolean; message: string }> {
+  static async sendWhatsApp(eventId: number, staffIds: number[]): Promise<{ success: boolean; dispatched?: number; message?: string }> {
     try {
       const response = await fetch(`${this.baseURL}/api/dispatch-staff`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          staffPhone: phone,
-          ...payload
-        })
+        body: JSON.stringify({ eventId, staffIds })
       });
 
       const result = await response.json();
