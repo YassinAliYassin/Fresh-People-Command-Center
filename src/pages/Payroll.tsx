@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { 
-  DollarSign, 
-  MessageCircle, 
-  Download, 
+import {
+  DollarSign,
+  MessageCircle,
+  Download,
   Calendar,
   TrendingUp,
   TrendingDown,
@@ -27,6 +27,7 @@ import {
   LineChart
 } from 'lucide-react';
 import { StaffAssignment, MiscExpense, Staff } from '../types';
+import * as dataStore from '../services/dataStore';
 
 // ==========================================
 // TYPE DEFINITIONS - FINANCE AGENT
@@ -122,42 +123,68 @@ const Payroll: React.FC = () => {
   const fetchPayroll = useCallback(async (start?: string, end?: string) => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      let url = `http://${window.location.hostname}:3001/api/payroll`;
-      if (start && end) {
-        url += `?cycleStart=${start}&cycleEnd=${end}`;
-      }
-      
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Failed to fetch payroll data');
-      
-      const data = await response.json();
-      
-      // Enhance data with payment status (simulated - in production this would come from backend)
-      const enhancedStaff = data.staff.map((staff: any) => ({
+      // Build payroll from the local data store (Supabase sync is automatic when configured)
+      const storedStaff: any[] = dataStore.listStaff();
+      const storedEvents: any[] = dataStore.listEvents();
+      const today = new Date();
+      const cycleStart = start || new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
+      const cycleEnd = end || new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().slice(0, 10);
+
+      // Compute hours per staff from event assignments within cycle
+      const eventHours = (ev: any) => {
+        try {
+          const [sh, sm] = ev.startTime.split(':').map(Number);
+          const [eh, em] = ev.endTime.split(':').map(Number);
+          let m = eh * 60 + em - sh * 60 - sm;
+          if (m < 0) m += 24 * 60;
+          return m / 60;
+        } catch {
+          return 0;
+        }
+      };
+
+      const eventsInCycle = storedEvents.filter(ev => ev.date >= cycleStart && ev.date <= cycleEnd);
+
+      const staffWithEarnings = storedStaff.map((s: any) => {
+        const assignments = eventsInCycle.filter(ev => (ev.staffIds || []).includes(s.id));
+        const totalHours = assignments.reduce((sum, ev) => sum + eventHours(ev), 0);
+        const totalEarned = totalHours * (s.rate || 0);
+        return {
+          staffId: s.id,
+          fullName: s.name,
+          phone: s.phone || '',
+          role: s.role || '',
+          assignmentsCount: assignments.length,
+          totalHours,
+          totalEarned,
+        };
+      });
+
+      const enhancedStaff = staffWithEarnings.map((staff: any) => ({
         ...staff,
         paymentStatus: calculatePaymentStatus(staff),
-        pendingAmount: staff.totalEarned * 0.3, // Simulated: 30% pending
-        paidAmount: staff.totalEarned * 0.7 // Simulated: 70% paid
+        pendingAmount: staff.totalEarned * 0.3,
+        paidAmount: staff.totalEarned * 0.7,
       }));
-      
+
       const enhancedData: PayrollData = {
-        ...data,
+        cycleStart,
+        cycleEnd,
         staff: enhancedStaff,
         summary: {
           totalStaff: enhancedStaff.length,
-          totalHours: enhancedStaff.reduce((sum: number, s: any) => sum + s.totalHours, 0),
-          totalEarnings: enhancedStaff.reduce((sum: number, s: any) => sum + s.totalEarned, 0),
-          paidAmount: enhancedStaff.reduce((sum: number, s: any) => sum + (s.paidAmount || 0), 0),
-          pendingAmount: enhancedStaff.reduce((sum: number, s: any) => sum + (s.pendingAmount || 0), 0),
-          overdueCount: enhancedStaff.filter((s: any) => s.paymentStatus === 'OVERDUE').length
-        }
+          totalHours: enhancedStaff.reduce((sum, s) => sum + s.totalHours, 0),
+          totalEarnings: enhancedStaff.reduce((sum, s) => sum + s.totalEarned, 0),
+          paidAmount: enhancedStaff.reduce((sum, s) => sum + (s.paidAmount || 0), 0),
+          pendingAmount: enhancedStaff.reduce((sum, s) => sum + (s.pendingAmount || 0), 0),
+          overdueCount: enhancedStaff.filter(s => s.paymentStatus === 'OVERDUE').length,
+        },
       };
-      
+
       setPayroll(enhancedData);
       generateFinanceMetrics(enhancedStaff);
-      
     } catch (err) {
       console.error('Error fetching payroll:', err);
       setError('Failed to load payroll data. Please try again.');

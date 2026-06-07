@@ -5,15 +5,16 @@ import Payroll from './pages/Payroll';
 import StaffCard from './components/StaffCard';
 import { FPCCCore } from './services/fpcc-core';
 import ModelPanel from './components/ModelPanel';
+import * as dataStore from './services/dataStore';
 
 // ─── Constants & Seed ────────────────────────────────────────────────────────
 const INITIAL_STAFF = [
-  { id:1, name:"Amara Diallo",   role:"Bar Staff",   rate:14.5, pin:"1111", uniform:true,  department:"Bar",        email:"amara@freshpeople.co.za",   phone:"+27 71 001 0001" },
-  { id:2, name:"Themba Nkosi",   role:"Floor Staff", rate:13.0, pin:"2222", uniform:true,  department:"Floor",      email:"themba@freshpeople.co.za",   phone:"+27 71 001 0002" },
-  { id:3, name:"Priya Moodley",  role:"Supervisor",  rate:17.0, pin:"3333", uniform:false, department:"Management", email:"priya@freshpeople.co.za",    phone:"+27 71 001 0003" },
-  { id:4, name:"Lerato Khumalo", role:"Bar Staff",   rate:14.5, pin:"4444", uniform:true,  department:"Bar",        email:"lerato@freshpeople.co.za",   phone:"+27 71 001 0004" },
-  { id:5, name:"Sipho Dlamini",  role:"Security",    rate:15.5, pin:"5555", uniform:true,  department:"Security",   email:"sipho@freshpeople.co.za",    phone:"+27 71 001 0005" },
-  { id:6, name:"Naledi Tau",     role:"Floor Staff", rate:13.0, pin:"6666", uniform:false, department:"Floor",      email:"naledi@freshpeople.co.za",   phone:"+27 71 001 0006" },
+  { id:1, name:"Amara Diallo",   role:"Bar Staff",   rate:40, pin:"1111", uniform:true,  department:"Bar",        email:"amara@freshpeople.co.za",   phone:"+27 71 001 0001" },
+  { id:2, name:"Themba Nkosi",   role:"Floor Staff", rate:40, pin:"2222", uniform:true,  department:"Floor",      email:"themba@freshpeople.co.za",   phone:"+27 71 001 0002" },
+  { id:3, name:"Priya Moodley",  role:"Supervisor",  rate:55, pin:"3333", uniform:false, department:"Management", email:"priya@freshpeople.co.za",    phone:"+27 71 001 0003" },
+  { id:4, name:"Lerato Khumalo", role:"Bar Staff",   rate:40, pin:"4444", uniform:true,  department:"Bar",        email:"lerato@freshpeople.co.za",   phone:"+27 71 001 0004" },
+  { id:5, name:"Sipho Dlamini",  role:"Security",    rate:45, pin:"5555", uniform:true,  department:"Security",   email:"sipho@freshpeople.co.za",    phone:"+27 71 001 0005" },
+  { id:6, name:"Naledi Tau",     role:"Floor Staff", rate:40, pin:"6666", uniform:false, department:"Floor",      email:"naledi@freshpeople.co.za",   phone:"+27 71 001 0006" },
 ];
 
 const today   = new Date();
@@ -28,9 +29,9 @@ const INITIAL_EVENTS = [
 ];
 
 const INITIAL_CLIENTS = [
-  { id:1, name:"Sandton Events Co",  email:"ops@sandtonevents.co.za",  vatNo:"4130265178", address:"14 Maude St, Sandton, 2196",   phone:"+27 11 555 0100" },
-  { id:2, name:"MTN Group Ltd",      email:"procurement@mtn.com",      vatNo:"4000109388", address:"216 14th Ave, Fairland, 2195", phone:"+27 11 912 3000" },
-  { id:3, name:"Priya & Dev Khumalo",email:"priya.khumalo@gmail.com",  vatNo:"",           address:"Private, KwaZulu-Natal",       phone:"+27 82 333 0001" },
+  { id:1, name:"Sandton Events Co",  email:"ops@sandtonevents.co.za",  vatNo:"4130265178", address:"14 Maude St, Sandton, 2196",   phone:"+27 11 555 0100", hourlyRate:90 },
+  { id:2, name:"MTN Group Ltd",      email:"procurement@mtn.com",      vatNo:"4000109388", address:"216 14th Ave, Fairland, 2195", phone:"+27 11 912 3000", hourlyRate:120 },
+  { id:3, name:"Priya & Dev Khumalo",email:"priya.khumalo@gmail.com",  vatNo:"",           address:"Private, KwaZulu-Natal",       phone:"+27 82 333 0001", hourlyRate:95 },
 ];
 
 const INITIAL_INVOICES = [
@@ -179,11 +180,21 @@ async function callClaude(systemPrompt, userPrompt, modelOverride = null) {
 // ─── Document Print View (Invoice / Quote / Statement) ───────────────────────
 function DocPrint({doc, docType, client, event: evt, allDocs, onClose}){
   const sub  = docSubtotal(doc.lines);
-  const vat  = sub*0.15;
+  const includeTax = doc.includeTax !== false; // default true for legacy data
+  const taxRate = Number(doc.taxRate ?? 15);
+  const vat  = includeTax ? sub * (taxRate / 100) : 0;
   const total= sub+vat;
   const isPaid = docType==="statement";
-  const paidAmt = isPaid ? allDocs.filter(d=>d.clientId===doc.clientId&&d.status==="paid").reduce((a,d)=>a+docSubtotal(d.lines)*1.15,0) : 0;
-  const outstanding = isPaid ? allDocs.filter(d=>d.clientId===doc.clientId&&d.status!=="paid").reduce((a,d)=>a+docSubtotal(d.lines)*1.15,0) : 0;
+  const paidAmt = isPaid ? allDocs.filter(d=>d.clientId===doc.clientId&&d.status==="paid").reduce((a,d)=>{
+    const s = docSubtotal(d.lines);
+    const tx = (d.includeTax !== false) ? s * (Number(d.taxRate ?? 15) / 100) : 0;
+    return a + s + tx;
+  }, 0) : 0;
+  const outstanding = isPaid ? allDocs.filter(d=>d.clientId===doc.clientId&&d.status!=="paid").reduce((a,d)=>{
+    const s = docSubtotal(d.lines);
+    const tx = (d.includeTax !== false) ? s * (Number(d.taxRate ?? 15) / 100) : 0;
+    return a + s + tx;
+  }, 0) : 0;
 
   const titles = {invoice:"TAX INVOICE", quote:"QUOTATION", statement:"ACCOUNT STATEMENT"};
   const statusC = STATUS_COLOR[doc.status]||MUTED;
@@ -314,7 +325,7 @@ function DocPrint({doc, docType, client, event: evt, allDocs, onClose}){
 }
 
 // ─── Document Form (Invoice or Quote) ────────────────────────────────────────
-function DocForm({docType, clients, events, existingDocs, onSave, onClose}){
+function DocForm({docType, clients, events, staff = [], existingDocs, onSave, onClose}){
   const prefix = docType==="invoice" ? "FP-INV" : "FP-QTE";
   const [form,setForm] = useState({
     docNo: nextDocNo(existingDocs, prefix),
@@ -325,35 +336,69 @@ function DocForm({docType, clients, events, existingDocs, onSave, onClose}){
     lines:[{desc:"",qty:1,rate:0}],
     notes: docType==="invoice"?"Thank you for your business.":"This quotation is valid for 30 days.",
     type: docType,
+    includeTax: true,
+    taxRate: 15,
   });
 
   function prefill(eventId){
     const ev=events.find(e=>e.id===Number(eventId));
     if(!ev){ setForm(f=>({...f,eventId})); return; }
     const hrs=eventHours(ev);
-    const lines=ev.staffIds.map(id=>{
-      const s=INITIAL_STAFF.find(x=>x.id===id);
-      return {desc:`${s?.name||"Staff"} — ${s?.role||""} (${hrs}h @ R${s?.rate}/h)`, qty:hrs, rate:s?.rate||0};
+    const client = clients.find(c=>c.id===ev.clientId);
+    const clientRate = client?.hourlyRate || 0;
+    // Build line items from the staff assigned to this event
+    const lines = ev.staffIds.map(id=>{
+      const s=staff.find(x=>x.id===id);
+      const rate = s?.rate || 0;
+      const total = (hrs * rate).toFixed(2);
+      return {
+        desc: `${s?.name||"Staff"} — ${s?.role||""} (${hrs}h @ R${rate}/h)`,
+        qty: hrs,
+        rate,
+        total: Number(total),
+        kind: 'staff',
+        staffId: s?.id,
+      };
     });
+    if (lines.length === 0 && clientRate) {
+      // No staff assigned: charge a flat hourly rate
+      lines.push({
+        desc: `${ev.title} — Service (${hrs}h @ R${clientRate}/h)`,
+        qty: hrs,
+        rate: clientRate,
+        total: Number((hrs * clientRate).toFixed(2)),
+        kind: 'service',
+      });
+    }
     setForm(f=>({...f,eventId,clientId:String(ev.clientId||f.clientId),lines}));
   }
-  function addLine(){ setForm(f=>({...f,lines:[...f.lines,{desc:"",qty:1,rate:0}]})); }
-  function updLine(i,k,v){ setForm(f=>({...f,lines:f.lines.map((l,j)=>j===i?{...l,[k]:v}:l)})); }
+  function addLine(kind='manual'){ setForm(f=>({...f,lines:[...f.lines,{desc:"",qty:1,rate:0,kind,total:0}]})); }
+  function updLine(i,k,v){ setForm(f=>({...f,lines:f.lines.map((l,j)=>{
+    const updated = j===i ? {...l, [k]: v} : l;
+    if (j===i) {
+      const qty = Number(updated.qty) || 0;
+      const rate = Number(updated.rate) || 0;
+      updated.total = Number((qty * rate).toFixed(2));
+    }
+    return updated;
+  })})); }
   function rmLine(i){ setForm(f=>({...f,lines:f.lines.filter((_,j)=>j!==i)})); }
 
   const sub=docSubtotal(form.lines);
+  const tax = form.includeTax ? sub * (Number(form.taxRate) || 0) / 100 : 0;
+  const total = sub + tax;
 
   return(
-    <Modal title={docType==="invoice"?"New Invoice":"New Quotation"} onClose={onClose} width={660}>
+    <Modal title={docType==="invoice"?"New Invoice":"New Quotation"} onClose={onClose} width={720}>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
         <Fld label="Doc Number"><input value={form.docNo} onChange={e=>setForm(f=>({...f,docNo:e.target.value}))} style={{width:"100%"}}/></Fld>
         <Fld label="Client *">
           <select value={form.clientId} onChange={e=>setForm(f=>({...f,clientId:e.target.value}))} style={{width:"100%"}}>
             <option value="">— Select client —</option>
-            {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+            {clients.map(c=><option key={c.id} value={c.id}>{c.name} (R{c.hourlyRate||90}/h)</option>)}
           </select>
         </Fld>
-        <Fld label="Link Event (auto-fills lines)">
+        <Fld label="Link Event (auto-fills from staff & hours)">
           <select value={form.eventId} onChange={e=>prefill(e.target.value)} style={{width:"100%"}}>
             <option value="">— None —</option>
             {events.map(ev=><option key={ev.id} value={ev.id}>{ev.title} ({fmtDate(ev.date)})</option>)}
@@ -365,29 +410,56 @@ function DocForm({docType, clients, events, existingDocs, onSave, onClose}){
           :<Fld label="Valid Until"><input type="date" value={form.validUntil} onChange={e=>setForm(f=>({...f,validUntil:e.target.value}))} style={{width:"100%"}}/></Fld>
         }
       </div>
-      <Fld label="Line Items">
+
+      <Fld label="Line Items (staff auto-filled from event; you can add extras)">
         {form.lines.map((l,i)=>(
-          <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 72px 96px 28px",gap:8,marginBottom:8,alignItems:"center"}}>
-            <input value={l.desc} onChange={e=>updLine(i,"desc",e.target.value)} placeholder="Description" style={{width:"100%"}}/>
-            <input type="number" value={l.qty} onChange={e=>updLine(i,"qty",e.target.value)} placeholder="Qty" style={{width:"100%",textAlign:"right"}}/>
+          <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 70px 90px 90px 28px",gap:8,marginBottom:8,alignItems:"center"}}>
+            <input value={l.desc} onChange={e=>updLine(i,"desc",e.target.value)} placeholder={l.kind==='staff'?"Staff line auto-filled":(l.kind==='service'?"Service line":"Description e.g. Equipment, transport, catering")} style={{width:"100%"}}/>
+            <input type="number" value={l.qty} onChange={e=>updLine(i,"qty",e.target.value)} placeholder="Qty/Hrs" style={{width:"100%",textAlign:"right"}}/>
             <input type="number" value={l.rate} onChange={e=>updLine(i,"rate",e.target.value)} placeholder="Rate" style={{width:"100%",textAlign:"right"}}/>
+            <div className="mono" style={{textAlign:"right",fontSize:12,color:ACCENT,padding:"0 8px"}}>
+              {((Number(l.qty)||0)*(Number(l.rate)||0)).toFixed(2)}
+            </div>
             <button onClick={()=>rmLine(i)} style={{background:"none",border:"none",color:MUTED,fontSize:18,cursor:"pointer"}}>×</button>
           </div>
         ))}
-        <Btn onClick={addLine} style={{fontSize:12,padding:"5px 12px"}}>+ Add Line</Btn>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:6}}>
+          <Btn onClick={()=>addLine('manual')} style={{fontSize:12,padding:"5px 12px"}}>+ Add manual item</Btn>
+          <Btn onClick={()=>addLine('service')} style={{fontSize:12,padding:"5px 12px"}}>+ Add service</Btn>
+          <Btn onClick={()=>addLine('staff')} style={{fontSize:12,padding:"5px 12px"}}>+ Add staff line</Btn>
+        </div>
       </Fld>
+
       <div style={{background:SURFACE2,borderRadius:8,padding:"12px 16px",marginBottom:14,fontSize:13}}>
         <div style={{display:"flex",justifyContent:"space-between",color:MUTED}}><span>Subtotal</span><span className="mono">R {sub.toFixed(2)}</span></div>
-        <div style={{display:"flex",justifyContent:"space-between",color:MUTED}}><span>VAT 15%</span><span className="mono">R {(sub*0.15).toFixed(2)}</span></div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",color:MUTED,marginTop:4}}>
+          <span style={{display:"flex",alignItems:"center",gap:6}}>
+            <input type="checkbox" checked={form.includeTax} onChange={e=>setForm(f=>({...f,includeTax:e.target.checked}))} id="incTax"/>
+            <label htmlFor="incTax" style={{cursor:"pointer"}}>VAT</label>
+            {form.includeTax && (
+              <input
+                type="number"
+                value={form.taxRate}
+                onChange={e=>setForm(f=>({...f,taxRate:Number(e.target.value)}))}
+                style={{width:60,padding:"2px 6px",fontSize:12}}
+                min={0}
+                max={100}
+              />
+            )}
+            {form.includeTax && <span>%</span>}
+          </span>
+          <span className="mono">R {tax.toFixed(2)}</span>
+        </div>
         <div style={{display:"flex",justifyContent:"space-between",fontWeight:600,marginTop:8,paddingTop:8,borderTop:`1px solid ${BORDER}`}}>
-          <span>Total</span><span className="mono" style={{color:ACCENT}}>R {(sub*1.15).toFixed(2)}</span>
+          <span>Total</span><span className="mono" style={{color:ACCENT}}>R {total.toFixed(2)}</span>
         </div>
       </div>
+
       <Fld label="Notes / Terms">
         <textarea value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} rows={2} style={{width:"100%"}}/>
       </Fld>
       <div style={{display:"flex",gap:10}}>
-        <Btn variant="primary" onClick={()=>onSave({...form,id:Date.now(),status:"draft",lines:form.lines.map(l=>({...l,qty:Number(l.qty),rate:Number(l.rate)}))})} style={{flex:1,padding:"11px"}}>
+        <Btn variant="primary" onClick={()=>onSave({...form,id:Date.now(),status:"draft",lines:form.lines.map(l=>({...l,qty:Number(l.qty)||0,rate:Number(l.rate)||0,total:Number((Number(l.qty)||0)*(Number(l.rate)||0))}))})} style={{flex:1,padding:"11px"}}>
           Create {docType==="invoice"?"Invoice":"Quote"}
         </Btn>
         <Btn variant="ghost" onClick={onClose} style={{flex:1,padding:"11px"}}>Cancel</Btn>
@@ -406,8 +478,8 @@ function DocumentsTab({invoices,setInvoices,quotes,setQuotes,clients,events}){
 
   const allDocs = [...invoices,...quotes];
 
-  const invTotal  = invoices.reduce((a,i)=>a+docSubtotal(i.lines)*1.15,0);
-  const invPaid   = invoices.filter(i=>i.status==="paid").reduce((a,i)=>a+docSubtotal(i.lines)*1.15,0);
+  const invTotal  = invoices.reduce((a,i)=>a + docSubtotal(i.lines) * (i.includeTax !== false ? (1 + (Number(i.taxRate) || 15) / 100) : 1), 0);
+  const invPaid   = invoices.filter(i=>i.status==="paid").reduce((a,i)=>a + docSubtotal(i.lines) * (i.includeTax !== false ? (1 + (Number(i.taxRate) || 15) / 100) : 1), 0);
   const invOverdue= invoices.filter(i=>i.status==="overdue").length;
   const quoteConv = quotes.length ? Math.round(quotes.filter(q=>q.status==="accepted").length/quotes.length*100) : 0;
 
@@ -446,7 +518,9 @@ function DocumentsTab({invoices,setInvoices,quotes,setQuotes,clients,events}){
           <tbody>{docs.map(doc=>{
             const client=clients.find(c=>c.id===doc.clientId);
             const event=events.find(e=>e.id===doc.eventId);
-            const total=(docSubtotal(doc.lines)*1.15).toFixed(2);
+            const sub=docSubtotal(doc.lines);
+            const tax = doc.includeTax !== false ? sub * (Number(doc.taxRate) || 15) / 100 : 0;
+            const total=(sub+tax).toFixed(2);
             const sc=STATUS_COLOR[doc.status]||MUTED;
             return(
               <tr key={doc.id} style={{borderTop:`1px solid ${BORDER}33`}}>
@@ -548,8 +622,20 @@ function DocumentsTab({invoices,setInvoices,quotes,setQuotes,clients,events}){
           docType={showForm}
           clients={clients}
           events={events}
+          staff={staff}
           existingDocs={showForm==="invoice"?invoices:quotes}
-          onSave={doc=>{ if(showForm==="invoice") setInvoices(p=>[doc,...p]); else setQuotes(p=>[doc,...p]); setShowForm(null); setToast({msg:`${showForm==="invoice"?"Invoice":"Quote"} ${doc.docNo} created`,type:"success"}); }}
+          onSave={doc=>{
+            if(showForm==="invoice") {
+              const created = dataStore.addInvoice(doc);
+              setInvoices(p=>[created,...p]);
+            } else {
+              const created = dataStore.addQuote(doc);
+              setQuotes(p=>[created,...p]);
+            }
+            setShowForm(null);
+            const t = showForm==="invoice" ? "Invoice" : "Quote";
+            setToast({msg: t + " " + doc.docNo + " created", type: "success"});
+          }}
           onClose={()=>setShowForm(null)}
         />
       )}
@@ -1450,7 +1536,7 @@ export default function App(){
               <div style={{maxWidth:500}}>
                 <div style={{display:"flex",flexDirection:"column",gap:14}}>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-                    {[{k:"name",l:"Full Name",p:"Amara Diallo"},{k:"role",l:"Role",p:"Bar Staff"},{k:"rate",l:"Hourly Rate (R)",p:"14.50",t:"number"},{k:"pin",l:"4-Digit PIN",p:"1234",mx:4}].map(f=>(
+                    {[{k:"name",l:"Full Name",p:"Amara Diallo"},{k:"role",l:"Role",p:"Bar Staff"},{k:"rate",l:"Hourly Rate (R)",p:"40",t:"number"},{k:"pin",l:"4-Digit PIN",p:"1234",mx:4}].map(f=>(
                       <div key={f.k}>
                         <Lbl>{f.l}</Lbl>
                         <input type={f.t||"text"} placeholder={f.p} maxLength={f.mx} value={newStaff[f.k]} onChange={e=>setNewStaff(p=>({...p,[f.k]:e.target.value}))} style={{width:"100%"}}/>
@@ -1472,14 +1558,23 @@ export default function App(){
                   <Btn variant="primary" onClick={()=>{ 
                     if(!newStaff.name||!newStaff.pin||!newStaff.rate) return; 
                     if(editingStaffId) {
-                      // Update existing staff
-                      setStaff(prev=>prev.map(s=>s.id===editingStaffId?{...s,...newStaff,rate:Number(newStaff.rate),uniform:newStaff.uniform}:s));
+                      // Update existing staff (persist to data store)
+                      const updated = dataStore.updateStaff(editingStaffId, {
+                        ...newStaff,
+                        rate: Number(newStaff.rate) || 40,
+                        uniform: newStaff.uniform
+                      });
+                      setStaff(prev=>prev.map(s=>s.id===editingStaffId?updated:s));
                       addToast(`${newStaff.name} updated`,"success");
                       setEditingStaffId(null);
                     } else {
-                      // Add new staff
-                      const newId = Math.max(...staff.map(s=>s.id)) + 1;
-                      setStaff(prev=>[...prev,{...newStaff,id:newId,rate:Number(newStaff.rate),uniform:newStaff.uniform}]);
+                      // Add new staff (persist to data store)
+                      const created = dataStore.addStaff({
+                        ...newStaff,
+                        rate: Number(newStaff.rate) || 40,
+                        uniform: newStaff.uniform
+                      });
+                      setStaff(prev=>[...prev, created]);
                       addToast(`${newStaff.name} added to roster`,"success");
                     }
                     setNewStaff({name:"",role:"",rate:"",pin:"",department:"Bar",uniform:false,email:"",phone:""}); 
