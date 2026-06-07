@@ -2,38 +2,11 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Users, Plus, Search, Mail, Phone, MapPin, Star, TrendingUp, Calendar,
   Edit, Trash2, X, Save, MessageCircle, ChevronRight, ChevronDown,
-  Award, Activity, Briefcase, DollarSign, Filter, MoreVertical
+  Award, Activity, Briefcase, DollarSign, Filter, MoreVertical,
+  Edit2, Clock, CheckCircle, XCircle, AlertCircle, UserPlus, FileText,
+  Eye, Send, MessageSquare, Target
 } from 'lucide-react';
 import * as dataStore from '../services/dataStore';
-import {
-  Plus,
-  Trash2,
-  Edit2,
-  DollarSign,
-  Calendar,
-  TrendingUp,
-  Search,
-  Filter,
-  Users,
-  Star,
-  Phone,
-  Mail,
-  MapPin,
-  Clock,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  UserPlus,
-  FileText,
-  Eye,
-  X,
-  ChevronRight,
-  Award,
-  Activity,
-  Send,
-  MessageSquare,
-  Target
-} from 'lucide-react';
 import { Client as BaseClient } from '../types';
 
 // ==========================================
@@ -70,6 +43,9 @@ interface CRMClient extends BaseClient {
 
 interface ClientsViewProps {
   onSelectClient?: (clientId: number) => void;
+  clients?: any[];
+  events?: any[];
+  addToast?: (msg: string, type?: string) => void;
 }
 
 // ==========================================
