@@ -1,5 +1,5 @@
 // Calendar API v2.0 - Uses shared lib/ical.js (DRY, robust node-ical parser)
-import { fetchAndParseICalendar, fetchICalendar, parseICalendar, DEFAULT_ICLOUD_URL } from '../lib/ical.js';
+import { fetchAndParseICalendar, fetchICalendar, parseICalendar, DEFAULT_ICLOUD_URL, sanitizeEnvValue } from '../lib/ical.js';
 
 export default async function handler(req, res) {
   try {
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
 
     // Fetch from iCloud calendar (shared lib handles validation + parsing)
     let iCloudEvents = [];
-    const iCloudUrl = process.env.ICLOUD_CALENDAR_URL || DEFAULT_ICLOUD_URL;
+    const iCloudUrl = sanitizeEnvValue(process.env.ICLOUD_CALENDAR_URL) || DEFAULT_ICLOUD_URL;
 
     if (iCloudUrl) {
       try {

@@ -1,7 +1,7 @@
 // Apple Calendar API - iCloud public feed
 // Uses shared lib/ical.js for parsing (DRY: single source of truth)
 
-import { fetchAndParseICalendar, parseICalendar, DEFAULT_ICLOUD_URL } from '../../lib/ical.js';
+import { fetchAndParseICalendar, parseICalendar, DEFAULT_ICLOUD_URL, sanitizeEnvValue } from '../../lib/ical.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -14,8 +14,8 @@ export default async function handler(req, res) {
   }
 
   // Allow query override (handy for testing different feeds)
-  // Fallback chain: query param → env var → default URL
-  const icloudUrl = req.query.url || process.env.ICLOUD_CALENDAR_URL || DEFAULT_ICLOUD_URL;
+  // Fallback chain: query param → sanitized env var → default URL
+  const icloudUrl = sanitizeEnvValue(req.query.url) || sanitizeEnvValue(process.env.ICLOUD_CALENDAR_URL) || DEFAULT_ICLOUD_URL;
 
   if (!icloudUrl) {
     return res.status(200).json({

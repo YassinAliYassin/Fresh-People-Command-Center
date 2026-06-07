@@ -1,5 +1,6 @@
 // WhatsApp Staff Dispatch API v2 - Uses real DB (no mock data)
 // Sends booking notifications via WhatsApp Business API to staff assigned to an event.
+import { sanitizeEnvValue } from '../lib/ical.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -145,8 +146,8 @@ Questions? Call +27 67 296 1272
 }
 
 async function sendWhatsAppMessage(phoneNumber, message) {
-  const whatsappToken = process.env.WHATSAPP_ACCESS_TOKEN;
-  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const whatsappToken = sanitizeEnvValue(process.env.WHATSAPP_ACCESS_TOKEN);
+  const phoneId = sanitizeEnvValue(process.env.WHATSAPP_PHONE_NUMBER_ID);
 
   if (!whatsappToken || !phoneId) {
     return { success: false, error: 'WhatsApp credentials not configured (set WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID)' };
