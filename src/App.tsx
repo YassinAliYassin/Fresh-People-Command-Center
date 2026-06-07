@@ -296,9 +296,10 @@ function DocPrint({doc, docType, client, event: evt, allDocs, onClose}){
             </table>
             <div style={{display:"flex",justifyContent:"flex-end",marginBottom:24}}>
               <table style={{fontSize:13,borderCollapse:"collapse"}}>
-                {[["Subtotal",`R ${sub.toFixed(2)}`],["VAT (15%)",`R ${vat.toFixed(2)}`]].map(([l,v])=>(
-                  <tr key={l}><td style={{padding:"4px 16px 4px 0",color:"#666"}}>{l}</td><td style={{padding:"4px 0",textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{v}</td></tr>
-                ))}
+                <tr><td style={{padding:"4px 16px 4px 0",color:"#666"}}>Subtotal</td><td style={{padding:"4px 0",textAlign:"right",fontFamily:"'DM Mono',monospace"}}>R {sub.toFixed(2)}</td></tr>
+                {includeTax && (
+                  <tr><td style={{padding:"4px 16px 4px 0",color:"#666"}}>VAT ({taxRate}%)</td><td style={{padding:"4px 0",textAlign:"right",fontFamily:"'DM Mono',monospace"}}>R {vat.toFixed(2)}</td></tr>
+                )}
                 <tr style={{borderTop:"2px solid #111"}}>
                   <td style={{padding:"8px 16px 4px 0",fontWeight:700,fontSize:15}}>Total</td>
                   <td style={{padding:"8px 0 4px 0",textAlign:"right",fontWeight:700,fontSize:15,fontFamily:"'DM Mono',monospace"}}>R {total.toFixed(2)}</td>
