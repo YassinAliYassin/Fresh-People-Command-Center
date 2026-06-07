@@ -1109,21 +1109,30 @@ export default function App(){
   const [page,setPage]           = useState("login");
   const [currentStaff,setCS]     = useState(null);
   const [isAdmin,setIsAdmin]     = useState(false);
-  const [staff,setStaff]      = useState(INITIAL_STAFF);
+  const [staff,setStaff]      = useState(() => dataStore.listStaff());
   const [records,setRecords]     = useState([]);
   const [now,setNow]             = useState(Date.now());
   const [adminTab,setAdminTab]   = useState("dashboard");
-  const [events,setEvents]       = useState(INITIAL_EVENTS);
+  const [events,setEvents]       = useState(() => dataStore.listEvents());
   const todayStr = ymd(today);
   const todayEvents = events.filter(e => e.date === todayStr);
-  const [invoices,setInvoices]   = useState(INITIAL_INVOICES);
-  const [quotes,setQuotes]       = useState(INITIAL_QUOTES);
-  const [clients]                = useState(INITIAL_CLIENTS);
+  const [invoices,setInvoices]   = useState(() => dataStore.listInvoices());
+  const [quotes,setQuotes]       = useState(() => dataStore.listQuotes());
+  const [clients,setClients]     = useState(() => dataStore.listClients());
   const [toasts,setToasts]       = useState([]);
   const [newStaff,setNewStaff]   = useState({name:"",role:"",rate:"",pin:"",department:"Bar",uniform:false,email:"",phone:""});
   const [editingStaffId,setEditingStaffId] = useState(null);
   const [currentModel,setCurrentModel] = useState('deepseek/deepseek-chat-v3-0324:free');
   const [currentTask,setCurrentTask] = useState('default');
+
+  // Refresh data from store whenever the user changes admin tab
+  useEffect(() => {
+    setStaff(dataStore.listStaff());
+    setEvents(dataStore.listEvents());
+    setInvoices(dataStore.listInvoices());
+    setQuotes(dataStore.listQuotes());
+    setClients(dataStore.listClients());
+  }, [adminTab]);
 
   useEffect(()=>{ const t=setInterval(()=>setNow(Date.now()),10000); return()=>clearInterval(t); },[]);
 
@@ -1271,6 +1280,30 @@ export default function App(){
             {/* DASHBOARD - Clean & Modern */}
             {adminTab==="dashboard"&&(
               <div>
+                {/* KPI Row */}
+                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:24}}>
+                  <div className="fp-kpi">
+                    <div className="fp-kpi__label">Active Staff</div>
+                    <div className="fp-kpi__value">{tActive || staff.filter(s=>s.uniform).length}</div>
+                    <div className="fp-kpi__sub">{staff.length} total in roster</div>
+                  </div>
+                  <div className="fp-kpi">
+                    <div className="fp-kpi__label">Shifts Today</div>
+                    <div className="fp-kpi__value">{todayEvents.length}</div>
+                    <div className="fp-kpi__sub">{events.length} events total</div>
+                  </div>
+                  <div className="fp-kpi">
+                    <div className="fp-kpi__label">Timesheets Pending</div>
+                    <div className="fp-kpi__value">{records.filter(r=>!r.clockOut).length}</div>
+                    <div className="fp-kpi__sub">{records.length} shifts logged</div>
+                  </div>
+                  <div className="fp-kpi">
+                    <div className="fp-kpi__label">Outstanding (ZAR)</div>
+                    <div className="fp-kpi__value">R {invoices.filter(i=>i.status!=="paid").reduce((a,i)=>a + docSubtotal(i.lines) * (i.includeTax !== false ? (1 + (Number(i.taxRate) || 15) / 100) : 1), 0).toFixed(0)}</div>
+                    <div className="fp-kpi__sub">{invoices.filter(i=>i.status!=="paid").length} unpaid</div>
+                  </div>
+                </div>
+
                 <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:24,marginBottom:24}}>
                   {/* Main Content */}
                   <div>
