@@ -1,26 +1,40 @@
 version: '3.8'
 
 services:
-  # FPCC Frontend + Backend
+  # FPCC App (Frontend + API)
   app:
     build: .
     ports:
-      - "3000:3000"
-      - "5173:5173"
+      - "3001:3001"
     environment:
-      - NODE_ENV=development
-      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
-      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+      - NODE_ENV=production
+      - PORT=3001
+      - DATABASE_URL=${DATABASE_URL}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - ICLOUD_CALENDAR_URL=${ICLOUD_CALENDAR_URL}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN}
     volumes:
-      - .:/app
-      - /app/node_modules
-    command: npm run dev -- --host 0.0.0.0
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Optional: Supabase local (if you want local DB)
-  # supabase:
-  #   image: supabase/supabase:latest
+  # Optional: Local Supabase (uncomment to use local DB)
+  # supabase-db:
+  #   image: supabase/postgres:15.1.0.147
   #   ports:
-  #     - "54321:54321"
+  #     - "5432:5432"
   #   environment:
-  #     - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
-  #     - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+  #     - POSTGRES_PASSWORD=your_password
+  #     - POSTGRES_DB=fpcc
+  #   volumes:
+  #     - supabase_data:/var/lib/postgresql/data
+  #   restart: unless-stopped
+
+volumes:
+  supabase_data:

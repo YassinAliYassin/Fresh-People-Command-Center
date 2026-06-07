@@ -1,19 +1,43 @@
-FROM node:22-alpine
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
+# Copy package files first for better caching
 COPY package*.json ./
-RUN npm install
+
+# Install dependencies
+RUN npm ci --only=production
 
 # Copy source code
 COPY . .
 
-# Build for production
+# Build the frontend
 RUN npm run build
 
-# Expose port (Vite dev server or Express backend)
-EXPOSE 3000 5173
+# Production stage
+FROM node:22-alpine
 
-# Start command (adjust based on your setup)
-CMD ["sh", "-c", "npm run dev -- --host 0.0.0.0 || node server.js"]
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install production dependencies only
+RUN npm ci --only=production
+
+# Copy built assets from builder
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/server.js ./
+COPY --from=builder /app/lib ./lib
+COPY --from=builder /app/api ./api
+COPY --from=builder /app/package*.json ./
+
+# Create data directory if needed
+RUN mkdir -p /app/data
+
+EXPOSE 3001
+
+ENV NODE_ENV=production
+ENV PORT=3001
+
+CMD ["node", "server.js"]
