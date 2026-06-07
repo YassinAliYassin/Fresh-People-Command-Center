@@ -115,7 +115,7 @@ async function handleWhatsAppMessage(message, metadata) {
 // Send acknowledgment message
 async function sendAcknowledgment(phone, status) {
   try {
-    const token = process.env.WHATSAPP_TOKEN;
+    const token = process.env.WHATSAPP_ACCESS_TOKEN;
     const phoneId = process.env.WHATSAPP_PHONE_ID;
 
     const message = status === 'confirmed' 
