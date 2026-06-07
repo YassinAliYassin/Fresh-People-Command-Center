@@ -1,10 +1,13 @@
+// Local Express dev server (NOT used by Vercel - Vercel uses /api/*.js serverless functions).
+// Mirrors the production API for local development.
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { fetchAndParseICalendar, DEFAULT_ICLOUD_URL } from './lib/ical.js';
 
-dotenv.config(); // Load environment variables from .env
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,155 +18,81 @@ const PORT = 3001;
 app.use(cors());
 app.use(express.json());
 
-    // Apple Calendar API
-    app.post('/api/calendar/apple', async (req, res) => {
-      try {
-        let { calendarUrl } = req.body;
-        if (!calendarUrl) {
-          calendarUrl = process.env.ICLOUD_CALENDAR_URL;
-        }
-        console.log('ICLOUD_CALENDAR_URL from env:', process.env.ICLOUD_CALENDAR_URL ? 'set' : 'not set');
-        if (!calendarUrl) {
-          return res.json({ 
-            success: false, 
-            events: [], 
-            count: 0, 
-            error: 'Calendar URL required (provide in request body or set ICLOUD_CALENDAR_URL env)' 
-          });
-        }
-
-        const response = await fetch(calendarUrl, { 
-          headers: { 'User-Agent': 'Mozilla/5.0 (Fresh People Command Center)' } 
-        });
-        if (!response.ok) {
-          throw new Error(`Failed to fetch iCloud calendar: ${response.status} ${response.statusText}`);
-        }
-        const icsText = await response.text();
-        const events = parseICS(icsText);
-
-        res.json({
-          success: true,
-          events: events,
-          count: events.length
-        });
-      } catch (error) {
-        console.error('Apple Calendar sync error:', error);
-        res.status(500).json({ 
-          success: false, 
-          events: [], 
-          count: 0, 
-          error: error.message 
-        });
-      }
-    });
-
-    // iCal parsing helpers
-    function parseICS(icsText) {
-      const events = [];
-
-      // Unfold folded lines (RFC 5545): replace CRLF + space/tab with nothing
-      const unfolded = icsText.replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '');
-      const lines = unfolded.split('\n');
-
-      let currentEvent = null;
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-
-        if (trimmed === 'BEGIN:VEVENT') {
-          currentEvent = {};
-        } else if (trimmed === 'END:VEVENT') {
-          if (currentEvent && currentEvent.start) {
-            events.push({
-              id: currentEvent.uid || `icloud-${Date.now()}`,
-              title: currentEvent.summary || 'Untitled Event',
-              start: currentEvent.dtstart,
-              end: currentEvent.dtend || currentEvent.dtstart,
-              source: 'icloud',
-              staff_assigned: '',
-              dressCode: 'Formal All Black',
-              clientName: ''
-            });
-          }
-          currentEvent = null;
-        } else if (currentEvent) {
-          if (trimmed.startsWith('UID:')) {
-            currentEvent.uid = trimmed.substring(4);
-          } else if (trimmed.startsWith('SUMMARY:')) {
-            currentEvent.summary = trimmed.substring(8);
-          } else if (trimmed.startsWith('DTSTART')) {
-            const val = trimmed.split(':').pop(); // get value after last colon
-            if (val) currentEvent.dtstart = formatICSDate(val);
-          } else if (trimmed.startsWith('DTEND')) {
-            const val = trimmed.split(':').pop(); // get value after last colon
-            if (val) currentEvent.dtend = formatICSDate(val);
-          }
-        }
-      }
-
-      return events;
-    }
-
-    function formatICSDate(icsDate) {
-      if (!icsDate) return new Date().toISOString();
-      // Parse basic format: YYYYMMDDTHHMMSS or YYYYMMDDTHHMM
-      const match = icsDate.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?$/);
-      if (!match) {
-        // fallback to new Date()
-        return new Date().toISOString();
-      }
-      let [, yearStr, monthStr, dayStr, hourStr, minuteStr, secondStr] = match;
-      const year = parseInt(yearStr, 10);
-      const month = parseInt(monthStr, 10) - 1; // because month in Date is 0-11
-      const day = parseInt(dayStr, 10);
-      const hour = parseInt(hourStr, 10);
-      const minute = parseInt(minuteStr, 10);
-      const second = secondStr ? parseInt(secondStr, 10) : 0;
-
-      // Convert the given local time (SAST) to UTC.
-      // South Africa Standard Time (SAST) is UTC+2, and does not observe DST.
-      // So to get UTC from SAST time, subtract 2 hours.
-      const utcTimeMs = Date.UTC(year, month, day, hour, minute, second) - 2 * 60 * 60 * 1000;
-      const date = new Date(utcTimeMs);
-      return date.toISOString();
-    }
-
-    // Dispatch Staff API
-app.post('/api/dispatch-staff', async (req, res) => {
+// Apple Calendar API - mirrors api/calendar/apple.js (uses shared lib)
+app.post('/api/calendar/apple', async (req, res) => {
   try {
-    const { eventId, staffIds } = req.body;
-    
-    res.json({
-      success: true,
-      dispatched: staffIds?.length || 0,
-      skipped: 0,
-      failed: 0,
-      details: (staffIds || []).map(id => ({
-        staffId: id,
-        status: 'sent',
-        messageId: `msg_${Date.now()}_${id}`
-      }))
-    });
+    const icloudUrl = req.body?.calendarUrl || process.env.ICLOUD_CALENDAR_URL || DEFAULT_ICLOUD_URL;
+    if (!icloudUrl) {
+      return res.json({
+        success: false,
+        events: [],
+        count: 0,
+        error: 'No iCloud URL configured (set ICLOUD_CALENDAR_URL or pass in body)',
+      });
+    }
+    const events = await fetchAndParseICalendar(icloudUrl);
+    return res.json({ success: true, events, count: events.length });
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      message: error.message 
-    });
+    console.error('Apple Calendar sync error:', error);
+    return res.status(500).json({ success: false, events: [], count: 0, error: error.message });
   }
 });
 
-// Google Calendar API
-app.post('/api/calendar/google', async (req, res) => {
-  res.json({ 
-    success: true, 
-    events: [], 
-    count: 0,
-    message: 'Google Calendar integration pending'
+// Calendar unified API - mirrors api/calendar.js
+app.get('/api/calendar', async (req, res) => {
+  try {
+    const icloudUrl = process.env.ICLOUD_CALENDAR_URL || DEFAULT_ICLOUD_URL;
+    let iCloudEvents = [];
+    if (icloudUrl) {
+      try {
+        iCloudEvents = await fetchAndParseICalendar(icloudUrl);
+      } catch (e) {
+        console.log('[Calendar] iCloud fetch/parse error:', e.message);
+      }
+    }
+    if (req.query.format === 'json') {
+      return res.json({ local: [], icloud: iCloudEvents });
+    }
+    // ICS format
+    let ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Fresh People//Command Center//EN\r\n';
+    for (const event of iCloudEvents) {
+      ics += `BEGIN:VEVENT\r\nUID:${event.uid}\r\nDTSTART:${event.start.replace(/[-:]/g, '').split('.')[0]}Z\r\nDTEND:${event.end.replace(/[-:]/g, '').split('.')[0]}Z\r\nSUMMARY:${event.title}\r\nEND:VEVENT\r\n`;
+    }
+    ics += 'END:VCALENDAR';
+    res.setHeader('Content-Type', 'text/calendar');
+    return res.send(ics);
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to generate calendar' });
+  }
+});
+
+// WhatsApp Staff Dispatch - mirrors api/dispatch-staff.js
+// For local dev, returns mock response (no real DB)
+app.post('/api/dispatch-staff', async (req, res) => {
+  const { eventId, staffIds } = req.body || {};
+  if (!eventId || !Array.isArray(staffIds) || staffIds.length === 0) {
+    return res.status(400).json({ success: false, error: 'eventId and staffIds required', dispatched: 0 });
+  }
+  // Local mock: just confirm the request shape is valid
+  return res.json({
+    success: true,
+    note: 'Local dev: WhatsApp dispatch is mock. Production: api/dispatch-staff.js uses real DB + Meta API.',
+    eventId,
+    dispatched: staffIds.length,
+    details: staffIds.map(id => ({ staffId: id, status: 'mock-sent' })),
   });
 });
 
-// Serve static files
+// Google Calendar API (mock for local dev)
+app.post('/api/calendar/google', (req, res) => {
+  res.json({
+    success: true,
+    events: [],
+    note: 'Local dev: configure GOOGLE_SERVICE_ACCOUNT_BASE64 in .env for real Google Calendar sync',
+  });
+});
+
+// Serve static build
 app.use(express.static(path.join(__dirname, 'dist')));
 
 // SPA fallback
@@ -173,4 +102,7 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`📅 Apple Calendar: POST http://localhost:${PORT}/api/calendar/apple`);
+  console.log(`📅 Calendar JSON: GET http://localhost:${PORT}/api/calendar?format=json`);
+  console.log(`📤 Dispatch: POST http://localhost:${PORT}/api/dispatch-staff`);
 });
