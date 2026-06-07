@@ -230,24 +230,11 @@ const Payroll: React.FC = () => {
 
   const filteredStaff = useMemo(() => {
     if (!payroll) return [];
-    
-    let filtered = payroll.staff;
-    
-    // Filter by payment status
-    if (statusFilter !== 'ALL') {
-      filtered = filtered.filter(s => s.paymentStatus === statusFilter);
-    }
-    
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(s => 
-        s.fullName.toLowerCase().includes(query) ||
-        s.role.toLowerCase().includes(query)
-      );
-    }
-    
-    return filtered;
+    const q = searchQuery.toLowerCase().trim();
+    return payroll.staff.filter(s => 
+      (statusFilter === 'ALL' || s.paymentStatus === statusFilter) &&
+      (q === '' || s.fullName.toLowerCase().includes(q) || s.role.toLowerCase().includes(q))
+    );
   }, [payroll, statusFilter, searchQuery]);
 
   const pendingPayments = useMemo(() => {
