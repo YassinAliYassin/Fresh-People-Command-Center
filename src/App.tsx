@@ -620,14 +620,14 @@ function CalendarTab({events,setEvents,staff,clients,addToast}){
     setSyncing(false);
   }
 
-  // Fetch Apple Calendar events via API endpoint
+  // Fetch Apple Calendar events via the new /api/calendar/apple endpoint
+  // (uses lib/ical.js with node-ical for robust RFC 5545 parsing)
   async function fetchApple() {
     setSyncingApple(true);
     try {
-      // Use API endpoint (credentials handled server-side)
-      const response = await fetch('/api/calendar/apple-sync');
+      const response = await fetch('/api/calendar/apple');
       const data = await response.json();
-      
+
       if (data.success && Array.isArray(data.events)) {
         setAppleEvents(data.events.map(e => ({
           ...e,
@@ -646,65 +646,6 @@ function CalendarTab({events,setEvents,staff,clients,addToast}){
     setSyncingApple(false);
   }
 
-  // Parse iCal format (simple parser)
-  function parseICal(icalData) {
-    const events = [];
-    const lines = icalData.split('\n');
-    let currentEvent = null;
-    
-    for (const line of lines) {
-      const trimmed = line.trim();
-      
-      if (trimmed === 'BEGIN:VEVENT') {
-        currentEvent = {};
-      } else if (trimmed === 'END:VEVENT') {
-        if (currentEvent && currentEvent.uid) {
-          events.push({
-            id: currentEvent.uid,
-            title: currentEvent.summary || 'Untitled Event',
-            start: currentEvent.dtstart || new Date().toISOString(),
-            end: currentEvent.dtend || new Date().toISOString(),
-            date: (currentEvent.dtstart || '').split('T')[0] || new Date().toISOString().split('T')[0],
-            description: currentEvent.description || '',
-            location: currentEvent.location || ''
-          });
-        }
-        currentEvent = null;
-      } else if (currentEvent) {
-        const idx = trimmed.indexOf(':');
-        if (idx > 0) {
-          const key = trimmed.substring(0, idx).split(';')[0];
-          const value = trimmed.substring(idx + 1);
-          
-          switch (key) {
-            case 'UID': currentEvent.uid = value; break;
-            case 'SUMMARY': currentEvent.summary = value; break;
-            case 'DTSTART': currentEvent.dtstart = parseICalDate(value); break;
-            case 'DTEND': currentEvent.dtend = parseICalDate(value); break;
-            case 'DESCRIPTION': currentEvent.description = value; break;
-            case 'LOCATION': currentEvent.location = value; break;
-          }
-        }
-      }
-    }
-    
-    return events;
-  }
-
-  function parseICalDate(dateStr) {
-    if (!dateStr) return new Date().toISOString();
-    // Simple iCal date parser
-    const clean = dateStr.split(';')[0];
-    if (clean.includes('T')) {
-      const year = clean.substring(0, 4);
-      const month = clean.substring(4, 6);
-      const day = clean.substring(6, 8);
-      const hour = clean.substring(9, 11);
-      const minute = clean.substring(11, 13);
-      return `${year}-${month}-${day}T${hour}:${minute}:00`;
-    }
-    return clean;
-  }
   // Push event to Apple Calendar (via Nylas) → syncs to Google Calendar
   async function pushToGcal(ev){
     if(!ev?.id) return;
