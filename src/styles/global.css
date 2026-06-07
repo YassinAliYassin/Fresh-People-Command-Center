@@ -1,0 +1,78 @@
+/* Global resets and base styles */
+*, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+
+body {
+  background: #0d1117;
+  color: #e6edf3;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Card */
+.fp-card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+
+/* Badge pills */
+.fp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-family: 'DM Mono', monospace;
+}
+.fp-badge--active, .fp-badge--paid, .fp-badge--approved, .fp-badge--completed { background:#1a3a2a; color:#3fb950; }
+.fp-badge--pending, .fp-badge--scheduled, .fp-badge--draft { background:#3a2f1a; color:#d29922; }
+.fp-badge--overdue, .fp-badge--rejected, .fp-badge--cancelled, .fp-badge--no_show { background:#3a1a1a; color:#f85149; }
+.fp-badge--sent, .fp-badge--confirmed { background:#1f3a5f; color:#58a6ff; }
+.fp-badge--partial { background:#3a2d1a; color:#e3b341; }
+.fp-badge--accepted { background:#2a1a3a; color:#bc8cff; }
+
+/* Buttons */
+.fp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Outfit', sans-serif;
+  cursor: pointer;
+  border:1px solid transparent;
+  transition: all 0.15s ease;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.fp-btn--primary { background:#58a6ff; color:#0d1117; border-color:#58a6ff; }
+.fp-btn--primary:hover { background:#79b8ff; border-color:#79b8ff; }
+.fp-btn--secondary { background:transparent; color:#e6edf3; border-color:#30363d; }
+.fp-btn--secondary:hover { background:#21262d; }
+.fp-btn--danger { background:transparent; color:#f85149; border-color:#f85149; }
+.fp-btn--danger:hover { background:#3a1a1a; }
+
+/* Table */
+.fp-table { width:100%; border-collapse:collapse; }
+.fp-table th {
+  text-align:left; padding:10px 12px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#8b949e; border-bottom:1px solid #30363d; font-family:'DM Mono', monospace;
+}
+.fp-table td { padding:11px 12px; border-bottom:1px solid #21262d; color:#e6edf3; font-size:13px; }
+.fp-table tr:hover td { background:#161b22; }
+.fp-table tr:last-child td { border-bottom:none; }
+
+/* KPI Card */
+.fp-kpi { background:#161b22; border:1px solid #30363d; border-radius:6px; padding:20px 24px; display:flex; flex-direction:column; gap:6px; }
+.fp-kpi__label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#8b949e; font-family:'DM Mono', monospace; }
+.fp-kpi__value { font-size:28px; font-weight:700; color:#e6edf3; line-height:1; font-family:'DM Mono', monospace; }
+.fp-kpi__sub { font-size:12px; color:#8b949e; }
