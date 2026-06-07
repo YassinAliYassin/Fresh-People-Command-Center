@@ -1,21 +1,22 @@
-// Calendar API v1.1 - Fixed folded line parsing + debug logs
+// Calendar API v2.0 - Uses shared lib/ical.js (DRY, robust node-ical parser)
+import { fetchAndParseICalendar, fetchICalendar, parseICalendar } from '../lib/ical.js';
+
 export default async function handler(req, res) {
-  
   try {
     // Dynamic import for pg (serverless-compatible)
     const { Pool } = await import('pg');
-    
+
     if (!process.env.DATABASE_URL) {
       return res.status(500).json({ error: 'DATABASE_URL not set' });
     }
-    
+
     const pool = new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false },
       max: 1,
       idleTimeoutMillis: 100
     });
-    
+
     // Fetch local events from database
     let eventsResult = { rows: [] };
     try {
@@ -23,33 +24,23 @@ export default async function handler(req, res) {
     } catch (e) {
       console.log('[Calendar] DB query failed:', e.message);
     }
-    
-    // Fetch from iCloud calendar
+
+    // Fetch from iCloud calendar (shared lib handles validation + parsing)
     let iCloudEvents = [];
     const iCloudUrl = process.env.ICLOUD_CALENDAR_URL;
-    
+
     if (iCloudUrl) {
       try {
-        console.log('[Calendar] Fetching iCloud URL:', iCloudUrl.substring(0, 50) + '...');
-        const response = await fetch(iCloudUrl, { 
-          headers: { 'User-Agent': 'Mozilla/5.0' }
-        });
-        console.log('[Calendar] iCloud fetch status:', response.status);
-        if (response.ok) {
-          const icsText = await response.text();
-          console.log('[Calendar] iCloud ICS length:', icsText.length);
-          iCloudEvents = parseICS(icsText);
-          console.log('[Calendar] Parsed iCloud events count:', iCloudEvents.length);
-        } else {
-          console.log('[Calendar] iCloud fetch failed:', response.status, response.statusText);
-        }
+        console.log('[Calendar] Fetching iCloud URL:', iCloudUrl.substring(0, 60) + '...');
+        iCloudEvents = await fetchAndParseICalendar(iCloudUrl);
+        console.log('[Calendar] Parsed iCloud events count:', iCloudEvents.length);
       } catch (e) {
-        console.log('[Calendar] iCloud fetch error:', e.message, e.stack);
+        console.log('[Calendar] iCloud fetch/parse error:', e.message);
       }
     } else {
       console.log('[Calendar] No ICLOUD_CALENDAR_URL set');
     }
-    
+
     await pool.end();
     
     // If JSON format requested (for frontend calendar UI)
@@ -84,63 +75,7 @@ export default async function handler(req, res) {
   }
 }
 
-function parseICS(icsText) {
-  const events = [];
-  
-  // Unfold folded lines (RFC 5545): replace CRLF + space/tab with nothing
-  const unfolded = icsText.replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '');
-  const lines = unfolded.split('\n');
-  
-  let currentEvent = null;
-  
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    
-    if (trimmed === 'BEGIN:VEVENT') {
-      currentEvent = {};
-    } else if (trimmed === 'END:VEVENT') {
-      if (currentEvent && currentEvent.start) {
-        events.push({
-          id: currentEvent.uid || `icloud-${Date.now()}`,
-          title: currentEvent.summary || 'Untitled Event',
-          start: currentEvent.dtstart,
-          end: currentEvent.dtend || currentEvent.dtstart,
-          source: 'icloud',
-          staff_assigned: '',
-          dressCode: 'Formal All Black',
-          clientName: ''
-        });
-      }
-      currentEvent = null;
-    } else if (currentEvent) {
-      if (trimmed.startsWith('UID:')) {
-        currentEvent.uid = trimmed.substring(4);
-      } else if (trimmed.startsWith('SUMMARY:')) {
-        currentEvent.summary = trimmed.substring(8);
-      } else if (trimmed.startsWith('DTSTART')) {
-        const val = trimmed.split(':')[1];
-        if (val) currentEvent.dtstart = formatICSDate(val);
-      } else if (trimmed.startsWith('DTEND')) {
-        const val = trimmed.split(':')[1];
-        if (val) currentEvent.dtend = formatICSDate(val);
-      }
-    }
-  }
-  
-  return events;
-}
-
-function formatICSDate(icsDate) {
-  if (!icsDate) return new Date().toISOString();
-  // Handle format like 20260531T180000Z
-  const year = icsDate.substring(0, 4);
-  const month = icsDate.substring(4, 6);
-  const day = icsDate.substring(6, 8);
-  const hour = icsDate.substring(9, 11);
-  const minute = icsDate.substring(11, 13);
-  return new Date(`${year}-${month}-${day}T${hour}:${minute}:00Z`).toISOString();
-}
+// parseICS / formatICSDate removed — use lib/ical.js (fetchAndParseICalendar / parseICalendar)
 
 function generateICS(localEvents, iCloudEvents) {
   let ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Fresh People//Command Center//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\n';
