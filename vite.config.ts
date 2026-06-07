@@ -16,9 +16,7 @@ export default defineConfig(() => {
       // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
-      watch: process.env.DISABLE_HMR === 'true' ? null : {},
-      // SPA fallback for React Router client-side routes
-      historyApiFallback: true,
+      watch: process.env.DISABLE_HMR === 'true' ? (null as any) : {},
       // Proxy API requests to Express backend
       proxy: {
         '/api': {
@@ -27,9 +25,6 @@ export default defineConfig(() => {
         }
       }
     },
-    // Preview server fallback for production builds
-    preview: {
-      historyApiFallback: true,
-    },
+    preview: {},
   };
 });

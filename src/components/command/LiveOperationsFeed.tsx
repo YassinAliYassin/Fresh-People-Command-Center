@@ -208,7 +208,7 @@ const LiveOperationsFeed: React.FC<LiveOperationsFeedProps> = ({
                   onClick={() => onStaffClick(staff)}
                 >
                   <div className="staff-avatar">
-                    {staff.fullName.charAt(0)}
+                    {(staff.fullName || staff.name || '').charAt(0)}
                   </div>
                   
                   <div className="staff-info">

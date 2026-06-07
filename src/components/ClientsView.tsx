@@ -342,34 +342,118 @@ const ClientsView: React.FC<ClientsViewProps> = ({ onSelectClient }) => {
   }
 
   return (
-    <div className="crm-container">
-      {/* Ambient Glow Effects */}
-      <div className="crm-ambient-glow crm-glow-1"></div>
-      <div className="crm-ambient-glow crm-glow-2"></div>
-
-      {/* CRM Header - Agent Identity */}
-      <div className="crm-header">
-        <div className="crm-header-left">
-          <div className="crm-icon">
-            <Users className="w-7 h-7" />
-          </div>
-          <div>
-            <h1 className="crm-title">CRM Agent</h1>
-            <p className="crm-subtitle">
-              {summaryStats.total} clients • {summaryStats.totalEvents} events • {formatCurrency(summaryStats.totalRevenue)} revenue
-            </p>
-          </div>
-        </div>
-        <div className="crm-header-right">
-          <button
-            onClick={handleAddNew}
-            className="crm-btn crm-btn-primary"
-          >
-            <Plus className="w-4 h-4" />
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-6xl mx-auto">
+        {/* Clean Header */}
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-2xl font-semibold text-gray-900">Clients</h1>
+          <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            <Plus size={18} />
             Add Client
           </button>
         </div>
+
+        {/* Clean KPI Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {[
+            { label: 'Total Clients', value: summaryStats.total, icon: <Users size={20} />, color: 'text-blue-600', bg: 'bg-blue-50' },
+            { label: 'Active Clients', value: summaryStats.active, icon: <Users size={20} />, color: 'text-green-600', bg: 'bg-green-50' },
+            { label: 'VIP Clients', value: summaryStats.vip, icon: <Star size={20} />, color: 'text-purple-600', bg: 'bg-purple-50' },
+            { label: 'Total Revenue', value: `R${summaryStats.totalRevenue}`, icon: <DollarSign size={20} />, color: 'text-emerald-600', bg: 'bg-emerald-50' }
+          ].map((stat, i) => (
+            <div key={i} className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md transition-all">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-600">{stat.label}</span>
+                <div className={`p-2 rounded-lg ${stat.bg} ${stat.color}`}>
+                  {stat.icon}
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Search & Filters */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search clients..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex gap-2">
+              {['all', 'active', 'vip', 'lead'].map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setStatusFilter(filter as any)}
+                  className={`px-4 py-2 rounded-lg capitalize ${
+                    statusFilter === filter
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {filter}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Client Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredAndSortedClients.map((client) => (
+            <div key={client.id} className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md transition-all">
+              <div className="flex items-start justify-between mb-3">
+                <h3 className="font-semibold text-gray-900">{client.name}</h3>
+                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                  client.status === 'active' ? 'bg-green-100 text-green-700' :
+                  client.status === 'vip' ? 'bg-purple-100 text-purple-700' :
+                  'bg-gray-100 text-gray-700'
+                }`}>
+                  {client.status}
+                </span>
+              </div>
+              
+              <div className="space-y-2 text-sm text-gray-600">
+                {client.email && (
+                  <div className="flex items-center gap-2">
+                    <Mail size={14} />
+                    <span>{client.email}</span>
+                  </div>
+                )}
+                {client.phone && (
+                  <div className="flex items-center gap-2">
+                    <Phone size={14} />
+                    <span>{client.phone}</span>
+                  </div>
+                )}
+              </div>
+              
+              <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-900">
+                  R{client.totalRevenue || 0}
+                </span>
+                <span className="text-xs text-gray-500">
+                  {client.eventsBooked || 0} events
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {filteredAndSortedClients.length === 0 && (
+          <div className="text-center py-12 text-gray-500">
+            No clients found
+          </div>
+        )}
       </div>
+    </div>
+  );
 
       {/* Controls Bar - Filters & Search */}
       <div className="crm-controls">
@@ -445,7 +529,7 @@ const ClientsView: React.FC<ClientsViewProps> = ({ onSelectClient }) => {
           <div className="crm-card-header">
             <div>
               <div className="crm-card-value">{summaryStats.total}</div>
-              <div className="crm-card-label">Total Clients</div>
+              <div className="card-label">Total Clients</div>
             </div>
             <div className="crm-card-icon" style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#3B82F6' }}>
               <Users className="w-6 h-6" />

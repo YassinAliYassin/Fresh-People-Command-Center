@@ -94,7 +94,7 @@ interface FinanceMetrics {
 // FINANCE AGENT - AUTONOMOUS PAYROLL SYSTEM
 // ==========================================
 
-const Payroll: React.FC = () => {
+const Payroll: React.FC<any> = (props: any) => {
   // Core State
   const [payroll, setPayroll] = useState<PayrollData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -224,7 +224,7 @@ const Payroll: React.FC = () => {
       ],
       staffBreakdown: staff.map(s => ({
         staffId: s.staffId,
-        fullName: s.fullName,
+        fullName: s.fullName || s.name || '',
         totalEarnings: s.totalEarned,
         totalHours: s.totalHours,
         eventCount: s.assignmentsCount,
@@ -529,7 +529,7 @@ Flow Events Finance Team`;
               key={status}
               onClick={() => setStatusFilter(status)}
               className={`finance-filter-btn ${statusFilter === status ? 'active' : ''}`}
-              style={statusFilter === status ? getStatusColor(status).border : {}}
+              style={statusFilter === status ? { borderColor: getStatusColor(status).border } : {}}
             >
               {status}
             </button>
@@ -578,8 +578,8 @@ Flow Events Finance Team`;
           onClick={() => setExpandedStaff(isExpanded ? null : staff.staffId)}
         >
           <div className="finance-staff-info">
-            <div className="finance-staff-avatar" style={{ background: statusStyle.bgColor, color: statusStyle.color }}>
-              {staff.fullName.charAt(0)}
+            <div className="finance-staff-avatar" style={{ background: statusStyle.bg, color: statusStyle.color }}>
+              {(staff.fullName || staff.name || '').charAt(0)}
             </div>
             <div>
               <p className="finance-staff-name">{staff.fullName}</p>

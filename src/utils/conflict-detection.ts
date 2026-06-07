@@ -43,6 +43,19 @@ export function detectBatchConflicts(events: CalendarEvent[]): ConflictInfo[] {
   return conflicts;
 }
 
+export function detectConflicts(events: CalendarEvent[]): ConflictInfo[] {
+  return detectBatchConflicts(events);
+}
+
+export function formatConflictMessage(conflict: ConflictInfo): string {
+  return conflict.message || 'Conflict detected';
+}
+
+export function suggestAlternativeSlots(event: CalendarEvent, existing: CalendarEvent[]): any[] {
+  // Basic stub: return empty suggestions
+  return [];
+}
+
 export function detectStaffAvailability(
   staffId: number, 
   newEvent: CalendarEvent, 
