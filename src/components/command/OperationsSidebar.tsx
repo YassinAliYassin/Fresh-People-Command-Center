@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { LayoutDashboard, CalendarDays, ListChecks, Link2, Users, UserCircle, Wallet, BarChart3, FileBarChart2, Bell, Settings, Receipt, FileText, BookOpen, Briefcase, Clock, Plus, Save, Trash2, Pencil } from 'lucide-react';
 
 /**
  * Enhanced Operations Sidebar
@@ -49,40 +50,40 @@ interface OperationsSidebarProps {
 const defaultNavigationSections: NavSection[] = [
   {
     title: 'OPERATIONS',
-    icon: '⚡',
+    icon: 'lightning',
     collapsible: false,
     items: [
-      { icon: '📊', label: 'Dashboard', path: '/', ariaLabel: 'Navigate to Dashboard' },
-      { icon: '📅', label: 'Calendar', path: '/calendar', ariaLabel: 'Navigate to Calendar' },
-      { icon: '📋', label: 'Events', path: '/events', badge: 5, ariaLabel: 'Navigate to Events' },
-      { icon: '🔗', label: 'Unified View', path: '/unified-calendar', ariaLabel: 'Navigate to Unified Calendar View' }
+      { icon: 'dashboard', label: 'Dashboard', path: '/', ariaLabel: 'Navigate to Dashboard' },
+      { icon: 'calendar', label: 'Calendar', path: '/calendar', ariaLabel: 'Navigate to Calendar' },
+      { icon: 'events', label: 'Events', path: '/events', badge: 5, ariaLabel: 'Navigate to Events' },
+      { icon: 'link', label: 'Unified View', path: '/unified-calendar', ariaLabel: 'Navigate to Unified Calendar View' }
     ]
   },
   {
     title: 'MANAGEMENT',
-    icon: '👥',
+    icon: 'staff',
     items: [
-      { icon: '👥', label: 'Staff', path: '/staff', ariaLabel: 'Navigate to Staff Management' },
-      { icon: '👤', label: 'Clients', path: '/clients', ariaLabel: 'Navigate to Client Management' },
-      { icon: '💰', label: 'Payroll', path: '/payroll', badge: 3, badgeVariant: 'alert', ariaLabel: 'Navigate to Payroll' }
+      { icon: 'staff', label: 'Staff', path: '/staff', ariaLabel: 'Navigate to Staff Management' },
+      { icon: 'clients', label: 'Clients', path: '/clients', ariaLabel: 'Navigate to Client Management' },
+      { icon: 'payroll', label: 'Payroll', path: '/payroll', badge: 3, badgeVariant: 'alert', ariaLabel: 'Navigate to Payroll' }
     ]
   },
   {
     title: 'INTELLIGENCE',
-    icon: '📈',
+    icon: 'analytics',
     items: [
-      { icon: '📈', label: 'Analytics', path: '/analytics', ariaLabel: 'Navigate to Analytics' },
-      { icon: '📊', label: 'Reports', path: '/reports', ariaLabel: 'Navigate to Reports' },
-      { icon: '🔔', label: 'Alerts', path: '/alerts', badge: 2, badgeVariant: 'alert', ariaLabel: 'Navigate to Alerts' }
+      { icon: 'analytics', label: 'Analytics', path: '/analytics', ariaLabel: 'Navigate to Analytics' },
+      { icon: 'reports', label: 'Reports', path: '/reports', ariaLabel: 'Navigate to Reports' },
+      { icon: 'alerts', label: 'Alerts', path: '/alerts', badge: 2, badgeVariant: 'alert', ariaLabel: 'Navigate to Alerts' }
     ]
   },
   {
     title: 'SYSTEM',
-    icon: '⚙️',
+    icon: 'settings',
     items: [
-      { icon: '⚙️', label: 'Settings', path: '/settings', ariaLabel: 'Navigate to Settings' },
-      { icon: '🔌', label: 'Integrations', path: '/integrations', ariaLabel: 'Navigate to Integrations' },
-      { icon: '📝', label: 'Activity Log', path: '/activity', ariaLabel: 'Navigate to Activity Log' }
+      { icon: 'settings', label: 'Settings', path: '/settings', ariaLabel: 'Navigate to Settings' },
+      { icon: 'integrations', label: 'Integrations', path: '/integrations', ariaLabel: 'Navigate to Integrations' },
+      { icon: 'activity', label: 'Activity Log', path: '/activity', ariaLabel: 'Navigate to Activity Log' }
     ]
   }
 ];
@@ -96,7 +97,36 @@ const defaultAgentTheme: AgentTheme = {
   gradientStart: '#BF8F3B',
   gradientEnd: '#FBBF24',
   agentName: 'Operations Command',
-  agentIcon: '🎯'
+  agentIcon: 'target'
+};
+
+// Map icon keys to Lucide components
+const ICON_MAP: Record<string, React.ComponentType<{ size?: number; color?: string }>> = {
+  dashboard: LayoutDashboard,
+  calendar: CalendarDays,
+  events: ListChecks,
+  link: Link2,
+  staff: Users,
+  clients: UserCircle,
+  payroll: Wallet,
+  analytics: BarChart3,
+  reports: FileBarChart2,
+  alerts: Bell,
+  settings: Settings,
+  integrations: Link2,
+  activity: BookOpen,
+  lightning: CalendarDays,
+  target: Settings,
+  quotes: FileText,
+  invoices: Receipt,
+  timesheets: Clock,
+  jobs: Briefcase,
+  statements: BookOpen,
+  roster: CalendarDays,
+  add: Plus,
+  save: Save,
+  delete: Trash2,
+  edit: Pencil,
 };
 
 const OperationsSidebar: React.FC<OperationsSidebarProps> = ({
@@ -240,7 +270,10 @@ const OperationsSidebar: React.FC<OperationsSidebarProps> = ({
             background: `linear-gradient(135deg, ${agentTheme.gradientStart}, ${agentTheme.gradientEnd})`
           }}>
             <div className="sidebar-logo-icon">
-              {agentTheme.agentIcon}
+              {(() => {
+                const Icon = ICON_MAP[agentTheme.agentIcon] || Settings;
+                return <Icon size={18} color="#0d1117" />;
+              })()}
             </div>
             {!collapsed && (
               <div className="sidebar-logo-text">
@@ -273,7 +306,12 @@ const OperationsSidebar: React.FC<OperationsSidebarProps> = ({
                   aria-expanded={expandedSections.includes(section.title)}
                   aria-controls={`section-${section.title.replace(/\s+/g, '-').toLowerCase()}`}
                 >
-                  <span className="section-icon">{section.icon}</span>
+                  <span className="section-icon">
+                    {(() => {
+                      const Icon = ICON_MAP[section.icon as string] || CalendarDays;
+                      return <Icon size={14} color={isSectionActive(section) ? '#58a6ff' : '#8b949e'} />;
+                    })()}
+                  </span>
                   <span className="section-title">{section.title}</span>
                   <span className={`section-chevron ${expandedSections.includes(section.title) ? 'expanded' : ''}`}>
                     ›
@@ -309,7 +347,12 @@ const OperationsSidebar: React.FC<OperationsSidebarProps> = ({
                         '--item-glow': agentTheme.glowColor
                       } as React.CSSProperties}
                     >
-                      <span className="sidebar-item-icon">{item.icon}</span>
+                      <span className="sidebar-item-icon">
+                        {(() => {
+                          const Icon = ICON_MAP[item.icon] || CalendarDays;
+                          return <Icon size={16} color={active ? '#58a6ff' : '#8b949e'} />;
+                        })()}
+                      </span>
                       
                       {!collapsed && (
                         <>

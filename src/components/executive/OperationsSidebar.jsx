@@ -1,34 +1,57 @@
 import React from 'react';
+import {
+  LayoutDashboard,
+  CalendarDays,
+  ListChecks,
+  Link2,
+  Users,
+  UserCircle,
+  Wallet,
+  Settings,
+  BarChart3,
+  Bell,
+  Zap,
+} from 'lucide-react';
 
-/**
- * Operations Sidebar Component
- * Executive operations navigation with status indicators
- */
+const ICONS = {
+  dashboard: LayoutDashboard,
+  calendar: CalendarDays,
+  events: ListChecks,
+  link: Link2,
+  staff: Users,
+  clients: UserCircle,
+  payroll: Wallet,
+  settings: Settings,
+  analytics: BarChart3,
+  notifications: Bell,
+  lightning: Zap,
+};
+
 const OperationsSidebar = ({ isOpen = true, onClose }) => {
   const menuSections = [
     {
       title: 'Operations',
       items: [
-        { icon: '📊', label: 'Dashboard', path: '/', badge: null },
-        { icon: '📅', label: 'Calendar', path: '/calendar', badge: null },
-        { icon: '📋', label: 'Events', path: '/events', badge: 5 },
-        { icon: '🔗', label: 'Unified View', path: '/unified-calendar', badge: null }
+        { icon: 'dashboard', label: 'Dashboard', path: '/', badge: null },
+        { icon: 'calendar', label: 'Calendar', path: '/calendar', badge: null },
+        { icon: 'events', label: 'Events', path: '/events', badge: 5 },
+        { icon: 'link', label: 'Unified View', path: '/unified-calendar', badge: null }
       ]
     },
     {
       title: 'Management',
       items: [
-        { icon: '👥', label: 'Staff', path: '/staff', badge: null },
-        { icon: '👤', label: 'Clients', path: '/clients', badge: null },
-        { icon: '💰', label: 'Payroll', path: '/payroll', badge: null }
+        { icon: 'staff', label: 'Staff', path: '/staff', badge: null },
+        { icon: 'clients', label: 'Clients', path: '/clients', badge: null },
+        { icon: 'payroll', label: 'Payroll', path: '/payroll', badge: null }
       ]
     },
     {
       title: 'System',
       items: [
-        { icon: '⚙️', label: 'Settings', path: '/settings', badge: null },
-        { icon: '📈', label: 'Analytics', path: '/analytics', badge: null },
-        { icon: '🔔', label: 'Notifications', path: '/notifications', badge: 3 }
+        { icon: 'settings', label: 'Settings', path: '/settings', badge: null },
+        { icon: 'analytics', label: 'Analytics', path: '/analytics', badge: null },
+        { icon: 'notifications', label: 'Notifications', path: '/notifications', badge: 3 }
       ]
     }
   ];
@@ -80,21 +103,26 @@ const OperationsSidebar = ({ isOpen = true, onClose }) => {
         {menuSections.map((section, sectionIndex) => (
           <div key={sectionIndex} className="sidebar-section">
             <div className="sidebar-section-title">{section.title}</div>
-            {section.items.map((item, itemIndex) => (
-              <div
-                key={itemIndex}
-                className={`sidebar-item ${
-                  window.location.pathname === item.path ? 'active' : ''
-                }`}
-                onClick={() => handleNavigation(item.path)}
-              >
-                <span className="sidebar-item-icon">{item.icon}</span>
-                <span className="sidebar-item-label">{item.label}</span>
-                {item.badge && (
-                  <span className="sidebar-item-badge">{item.badge}</span>
-                )}
-              </div>
-            ))}
+            {section.items.map((item, itemIndex) => {
+              const Icon = ICONS[item.icon] || LayoutDashboard;
+              return (
+                <div
+                  key={itemIndex}
+                  className={`sidebar-item ${
+                    window.location.pathname === item.path ? 'active' : ''
+                  }`}
+                  onClick={() => handleNavigation(item.path)}
+                >
+                  <span className="sidebar-item-icon">
+                    <Icon size={16} />
+                  </span>
+                  <span className="sidebar-item-label">{item.label}</span>
+                  {item.badge && (
+                    <span className="sidebar-item-badge">{item.badge}</span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ))}
 

@@ -94,7 +94,7 @@ function nextDocNo(arr, prefix) { return `${prefix}-${new Date().getFullYear()}-
 // ─── Shared UI ────────────────────────────────────────────────────────────────
 function Dot({on,color}){return <span style={{display:"inline-block",width:8,height:8,borderRadius:"50%",background:on?(color||ACCENT):MUTED,boxShadow:on?`0 0 6px ${color||ACCENT}`:"none",flexShrink:0}}/>;}
 function Badge({color,children}){return <span style={{display:"inline-block",padding:"2px 8px",borderRadius:4,fontSize:11,fontWeight:500,background:color+"22",color,border:`1px solid ${color}44`}}>{children}</span>;}
-function Stat({label,value,accent,sub}){
+function Stat({label,value,accent,sub}:{label:string;value:any;accent?:string;sub?:string}){
   return(
     <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:10,padding:"14px 18px"}}>
       <div style={{fontSize:11,color:MUTED,marginBottom:6}}>{label}</div>
