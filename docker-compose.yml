@@ -1,33 +1,26 @@
 version: '3.8'
 
 services:
-  flow:
+  # FPCC Frontend + Backend
+  app:
     build: .
     ports:
-      - "3001:3001"
       - "3000:3000"
+      - "5173:5173"
     environment:
-      - NODE_ENV=production
-      - PORT=3001
+      - NODE_ENV=development
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
     volumes:
-      - ./data:/app/data
-      - ./events.db:/app/events.db
-    restart: unless-stopped
+      - .:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0
 
-  # Optional: Add a reverse proxy like Caddy or Nginx if needed
-  # caddy:
-  #   image: caddy:2
+  # Optional: Supabase local (if you want local DB)
+  # supabase:
+  #   image: supabase/supabase:latest
   #   ports:
-  #     - "80:80"
-  #     - "443:443"
-  #   volumes:
-  #     - ./Caddyfile:/etc/caddy/Caddyfile
-  #     - caddy_data:/data
-  #     - caddy_config:/config
-  #   depends_on:
-  #     - flow
-  #   restart: unless-stopped
-
-# volumes:
-#   caddy_data:
-#   caddy_config:
+  #     - "54321:54321"
+  #   environment:
+  #     - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+  #     - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}

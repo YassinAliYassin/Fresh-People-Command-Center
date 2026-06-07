@@ -1,18 +1,19 @@
-# Build stage
-FROM node:20-alpine AS builder
+FROM node:22-alpine
+
 WORKDIR /app
+
+# Install dependencies
 COPY package*.json ./
-RUN npm ci
+RUN npm install
+
+# Copy source code
 COPY . .
+
+# Build for production
 RUN npm run build
 
-# Production stage
-FROM node:20-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY --from=builder /app/dist ./public
-COPY server.js .
-COPY db.js .
-EXPOSE 3001
-CMD ["node", "server.js"]
+# Expose port (Vite dev server or Express backend)
+EXPOSE 3000 5173
+
+# Start command (adjust based on your setup)
+CMD ["sh", "-c", "npm run dev -- --host 0.0.0.0 || node server.js"]
