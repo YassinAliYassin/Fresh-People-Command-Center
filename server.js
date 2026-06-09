@@ -145,7 +145,12 @@ app.post('/api/calendar/google', (req, res) => {
 });
 
 // Finance API - invoices, quotations, statements, and staff-hours reconciliation.
-app.use('/api/finance', rateLimitWrites, async (req, res) => {
+// Vercel Hobby allows 12 functions, so this is mounted through /api/dashboard-data
+// and routed by resource=finance instead of a separate /api/finance function.
+app.use('/api/dashboard-data', rateLimitWrites, async (req, res) => {
+  if (String(req.query?.resource || req.query?.endpoint) !== 'finance') {
+    return res.status(404).json({ error: 'Local dashboard-data route not configured' });
+  }
   await handleFinanceRequest(req, res);
 });
 
@@ -162,8 +167,8 @@ app.listen(PORT, () => {
   console.log(`📅 Apple Calendar: POST http://localhost:${PORT}/api/calendar/apple`);
   console.log(`📅 Calendar JSON: GET http://localhost:${PORT}/api/calendar?format=json`);
   console.log(`📤 Dispatch: POST http://localhost:${PORT}/api/dispatch-staff (protected)`);
-  console.log(`🧾 Finance: GET/POST/PATCH/DELETE http://localhost:${PORT}/api/finance?resource=docs`);
-  console.log(`⏱️ Staff hours: GET/POST http://localhost:${PORT}/api/finance?resource=staff-hours`);
+  console.log(`🧾 Finance: GET/POST/PATCH/DELETE http://localhost:${PORT}/api/dashboard-data?resource=finance&financeResource=docs`);
+  console.log(`⏱️ Staff hours: GET/POST http://localhost:${PORT}/api/dashboard-data?resource=finance&financeResource=staff-hours`);
   console.log(`🔐 Login for token: POST http://localhost:${PORT}/api/login {password: '...'}`);
   console.log(`🛡️ Writes to /api/staff and /api/events now require admin token (see SECURITY.md)`);
 });

@@ -111,11 +111,11 @@ export class FinanceApi {
   }
 
   static async listDocs(): Promise<FinanceDocsResponse> {
-    return this.request('/api/finance?resource=docs');
+    return this.request('/api/dashboard-data?resource=finance&financeResource=docs');
   }
 
   static async createDoc(doc: Partial<FinanceDocument>): Promise<FinanceDocument> {
-    const result = await this.request<{ success: boolean; doc: FinanceDocument }>('/api/finance?resource=docs', {
+    const result = await this.request<{ success: boolean; doc: FinanceDocument }>('/api/dashboard-data?resource=finance&financeResource=docs', {
       method: 'POST',
       body: JSON.stringify(doc),
     });
@@ -123,7 +123,7 @@ export class FinanceApi {
   }
 
   static async updateDoc(id: number, patch: Partial<FinanceDocument>): Promise<FinanceDocument> {
-    const result = await this.request<{ success: boolean; doc: FinanceDocument }>(`/api/finance?resource=docs&id=${id}`, {
+    const result = await this.request<{ success: boolean; doc: FinanceDocument }>(`/api/dashboard-data?resource=finance&financeResource=docs&id=${id}`, {
       method: 'PATCH',
       body: JSON.stringify(patch),
     });
@@ -131,33 +131,35 @@ export class FinanceApi {
   }
 
   static async deleteDoc(id: number): Promise<void> {
-    await this.request(`/api/finance?resource=docs&id=${id}`, { method: 'DELETE' });
+    await this.request(`/api/dashboard-data?resource=finance&financeResource=docs&id=${id}`, { method: 'DELETE' });
   }
 
   static async convertQuote(id: number): Promise<FinanceDocument> {
-    const result = await this.request<{ success: boolean; invoice: FinanceDocument }>(`/api/finance?resource=convert&id=${id}`, {
+    const result = await this.request<{ success: boolean; invoice: FinanceDocument }>(`/api/dashboard-data?resource=finance&financeResource=convert&id=${id}`, {
       method: 'POST',
     });
     return result.invoice;
   }
 
   static async getStatement(clientId: number): Promise<StatementResponse> {
-    return this.request(`/api/finance?resource=statement&clientId=${clientId}`);
+    return this.request(`/api/dashboard-data?resource=finance&financeResource=statement&clientId=${clientId}`);
   }
 
   static async getStaffHours(start?: string, end?: string): Promise<StaffHoursResponse> {
     const query = new URLSearchParams();
-    query.set('resource', 'staff-hours');
+    query.set('resource', 'finance');
+    query.set('financeResource', 'staff-hours');
     if (start) query.set('start', start);
     if (end) query.set('end', end);
-    return this.request(`/api/finance?${query.toString()}`);
+    return this.request(`/api/dashboard-data?${query.toString()}`);
   }
 
   static async recalculateStaffHours(start?: string, end?: string): Promise<StaffHoursResponse> {
     const query = new URLSearchParams();
-    query.set('resource', 'staff-hours');
+    query.set('resource', 'finance');
+    query.set('financeResource', 'staff-hours');
     if (start) query.set('start', start);
     if (end) query.set('end', end);
-    return this.request(`/api/finance?${query.toString()}`, { method: 'POST', body: '{}' });
+    return this.request(`/api/dashboard-data?${query.toString()}`, { method: 'POST', body: '{}' });
   }
 }
