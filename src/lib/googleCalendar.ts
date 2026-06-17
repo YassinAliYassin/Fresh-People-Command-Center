@@ -83,11 +83,11 @@ export async function pushEventToGoogleCalendar(
     location: venueAddress || venueName,
     start: {
       dateTime: startISO,
-      timeZone: 'Europe/Paris', // Set corresponding client zone or let device locale determine
+      timeZone: 'Africa/Johannesburg',
     },
     end: {
       dateTime: endISO,
-      timeZone: 'Europe/Paris',
+      timeZone: 'Africa/Johannesburg',
     },
     extendedProperties: {
       private: {

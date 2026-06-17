@@ -1144,6 +1144,9 @@ export default function App() {
     'Hi {StaffName} hope you are well. Are you available on {Date} from {In} to {Out} with Fresh People mapping? Click links to reply: Confirm: {ConfirmLink} | Reject: {RejectLink}'
   );
 
+  // Mobile menu state
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   // Load and apply local data and parameter hooks
   useEffect(() => {
     // Check local storage or seed, force-migrating to South Africa Johannesburg setup
@@ -2757,6 +2760,14 @@ export default function App() {
       <header className="border-b border-gold-200/40 bg-white/80 backdrop-blur-md sticky top-0 z-40 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-4">
+            {/* Mobile hamburger menu button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden p-2 -ml-2 text-slate-600 hover:text-gold-600 hover:bg-slate-100 rounded transition-all cursor-pointer"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>}
+            </button>
             <div className="flex items-center space-x-3">
               <div className="w-2.5 h-2.5 rounded-full bg-gold-500 animate-pulse"></div>
               <span className="font-display tracking-[0.25em] font-bold text-slate-900 text-base md:text-lg">FRESH PEOPLE</span>
@@ -2821,13 +2832,28 @@ export default function App() {
         </div>
       </section>
 
+      {/* Mobile menu overlay backdrop */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Global Command Column Grid */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10">
 
         {/* ========================================================================= */}
         {/* LEFT COMPASS: Directories, Registries & Onboarding */}
         {/* ========================================================================= */}
-        <section id="directory_section" className="lg:col-span-4 flex flex-col space-y-6">
+        <section
+          id="directory_section"
+          className={`lg:col-span-4 flex flex-col space-y-6 ${
+            mobileMenuOpen
+              ? 'fixed inset-y-0 left-0 z-40 w-80 max-w-[85vw] overflow-y-auto bg-[#FAF9F6] p-4 pt-20 shadow-2xl lg:relative lg:inset-auto lg:z-auto lg:w-auto lg:max-w-none lg:overflow-visible lg:bg-transparent lg:p-0 lg:shadow-none'
+              : 'hidden lg:flex'
+          } transition-all duration-300`}
+        >
 
           {/* Master Directories Selection Box */}
           <div className="glass-panel rounded-lg p-5 shadow-luxury-glow flex flex-col">
