@@ -4,12 +4,11 @@ import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// ─── Initialize Firebase Admin (once per cold start) ─────────────────────────
+// Initialize Firebase Admin (once per cold start)
 function initAdmin() {
   if (getApps().length > 0) return;
   const projectId = process.env.FIREBASE_PROJECT_ID || "freshchat-3545e";
 
-  // Prefer explicit service account JSON (set via Vercel env FIREBASE_SERVICE_ACCOUNT)
   const saJson = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (saJson) {
     try {
@@ -21,16 +20,15 @@ function initAdmin() {
     }
   }
 
-  // Fallback: Application Default Credentials (works on GCP, not Vercel)
   initializeApp({ projectId });
 }
 
-// ─── Resolve Gemini API key ──────────────────────────────────────────────────
-function resolveApiKey(): string {
+// Resolve Gemini API key
+function resolveApiKey() {
   return process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "";
 }
 
-// ─── Main handler ────────────────────────────────────────────────────────────
+// Main handler
 export default async function handler(req, res) {
   // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -64,30 +62,34 @@ export default async function handler(req, res) {
       systemInstruction:
         "You are Hermes, the FPCC operations agent for Fresh People (SA events staffing). " +
         "Process calendar webhook payloads. For each event: " +
-        "1. Check staff availability (query Firestore schedules collection for conflicts) " +
-        "2. Upsert valid schedules to Firestore " +
-        "3. Log alerts for conflicts or issues " +
-        "Return a JSON summary: { actions_taken: [...], conflicts: [...], schedules_created: [...] }",
+        "1. Check staff availability by looking at the events data provided " +
+        "2. Return a JSON summary with actions_taken, conflicts, and recommendations",
     });
 
-    const prompt = `Process this calendar webhook payload. Use the tools available to check staff availability, upsert schedules, and log alerts:\n${JSON.stringify(payload, null, 2)}`;
+    const prompt =
+      "Process this calendar webhook payload and provide a JSON summary with actions_taken, conflicts, and scheduling recommendations:\n" +
+      JSON.stringify(payload, null, 2);
 
     const result = await model.generateContent(prompt);
     const text = result.response.text();
 
-    // Also log the raw webhook to Firestore for audit trail
-    await db.collection("webhook_logs").add({
-      source: "calendar",
-      payload,
-      hermes_response: text,
-      processed_at: FieldValue.serverTimestamp(),
-    });
+    // Log to Firestore for audit trail
+    try {
+      await db.collection("webhook_logs").add({
+        source: "calendar",
+        payload,
+        hermes_response: text,
+        processed_at: FieldValue.serverTimestamp(),
+      });
+    } catch (dbErr) {
+      console.error("[Hermes] Firestore log error:", dbErr);
+    }
 
     return res.status(200).json({
       status: "processed",
       hermes_report: text,
     });
-  } catch (err: unknown) {
+  } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[Hermes Webhook] Error:", errMsg);
     return res.status(500).json({ error: errMsg });
