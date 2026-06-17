@@ -1,11 +1,25 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import {defineConfig, loadEnv} from 'vite';
 
-export default defineConfig(() => {
+export default defineConfig(({mode}) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  // Gemini key resolution order: explicit Gemini var -> generic VITE_API_KEY -> AI Studio's API_KEY/GEMINI_API_KEY
+  const geminiKey =
+    env.VITE_GEMINI_API_KEY ||
+    env.VITE_API_KEY ||
+    env.GEMINI_API_KEY ||
+    env.API_KEY ||
+    '';
   return {
     plugins: [react(), tailwindcss()],
+    // Expose the key as process.env.API_KEY so the SAME code path works in
+    // Google AI Studio Build (which injects process.env.API_KEY) and in local/Firebase builds.
+    define: {
+      'process.env.API_KEY': JSON.stringify(geminiKey),
+      'process.env.GEMINI_API_KEY': JSON.stringify(geminiKey),
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

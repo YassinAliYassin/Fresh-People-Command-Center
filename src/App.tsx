@@ -6,6 +6,7 @@ import StaffCard from './components/StaffCard';
 import { FPCCCore } from './services/fpcc-core';
 import { FinanceApi } from './services/financeApi';
 import ModelPanel from './components/ModelPanel';
+import { geminiOpsInsights, geminiAvailable } from './services/geminiClient';
 import * as dataStore from './services/dataStore';
 import type { LocalStore } from './services/dataStore';
 
@@ -177,6 +178,54 @@ async function callClaude(systemPrompt, userPrompt, modelOverride = null) {
     console.error('callClaude error:', e);
     return "[Error: " + e.message + "]";
   }
+}
+
+// ─── Gemini AI Insights card (Google AI Studio powered) ─────────────────────
+function AIInsightsCard({staff, events, clients, invoices, quotes}: any){
+  const [loading,setLoading] = useState(false);
+  const [insight,setInsight] = useState("");
+  const [err,setErr] = useState("");
+  const available = geminiAvailable();
+
+  async function run(){
+    setLoading(true); setErr(""); setInsight("");
+    try{
+      const text = await geminiOpsInsights({staff,events,clients,invoices,quotes});
+      if(text.startsWith("[Error")) setErr(text.replace(/^\[Error:\s*/,"").replace(/\]$/,""));
+      else setInsight(text);
+    }catch(e:any){ setErr(e?.message||"Failed"); }
+    finally{ setLoading(false); }
+  }
+
+  return (
+    <div style={{background:SURFACE,border:`1px solid ${BORDER}`,borderRadius:12,padding:"18px 20px",marginBottom:24}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:16}}>✨</span>
+          <h2 style={{fontSize:16,fontWeight:600,color:TEXT,margin:0}}>AI Operations Insights</h2>
+          <span style={{fontSize:10,background:PURPLE+"22",color:PURPLE,padding:"2px 8px",borderRadius:6}}>Gemini</span>
+        </div>
+        <button onClick={run} disabled={loading||!available}
+          style={{background:available?`linear-gradient(135deg, ${ACCENT} 0%, ${PURPLE} 100%)`:SURFACE2,
+            border:"none",borderRadius:8,padding:"7px 14px",color:available?"#0d1117":MUTED,fontWeight:600,
+            fontSize:12,cursor:available&&!loading?"pointer":"not-allowed",opacity:loading?0.6:1}}>
+          {loading?"Analyzing…":"Generate Insights"}
+        </button>
+      </div>
+      {!available && (
+        <div style={{color:MUTED,fontSize:12}}>
+          Gemini key not configured. Set <code style={{color:ACCENT}}>VITE_GEMINI_API_KEY</code> (build) or <code style={{color:ACCENT}}>API_KEY</code> (AI Studio).
+        </div>
+      )}
+      {err && <div style={{color:RED,fontSize:12}}>⚠ {err}</div>}
+      {!insight && !err && available && !loading && (
+        <div style={{color:MUTED,fontSize:12}}>Click "Generate Insights" for an AI summary of staffing gaps, billing flags, and suggestions.</div>
+      )}
+      {insight && (
+        <div style={{color:TEXT,fontSize:13,lineHeight:1.6,whiteSpace:"pre-wrap"}}>{insight}</div>
+      )}
+    </div>
+  );
 }
 
 // ─── Document Print View (Invoice / Quote / Statement) ───────────────────────
@@ -1448,6 +1497,9 @@ export default function App(){
                     <div className="fp-kpi__sub">{invoices.filter(i=>i.status!=="paid").length} unpaid</div>
                   </div>
                 </div>
+
+                {/* AI Operations Insights (Gemini) */}
+                <AIInsightsCard staff={staff} events={events} clients={clients} invoices={invoices} quotes={quotes}/>
 
                 <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:24,marginBottom:24}}>
                   {/* Main Content */}
