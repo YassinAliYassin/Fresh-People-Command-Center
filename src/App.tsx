@@ -46,6 +46,7 @@ import {
 } from './lib/googleCalendar';
 
 const RoleChart = lazy(() => import('./components/RoleChart'));
+const StaffShiftCalendar = lazy(() => import('./components/StaffShiftCalendar'));
 
 // Safe self-healing global localStorage wrapper to prevent QuotaExceededError crashes
 try {
@@ -1147,6 +1148,11 @@ export default function App() {
   const [eventSearchQuery, setEventSearchQuery] = useState('');
   const [eventStatusFilter, setEventStatusFilter] = useState<'all' | 'Pending' | 'Confirmed' | 'Canceled'>('all');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+
+  // Staff Shift Calendar states
+  const [selectedShiftStaffId, setSelectedShiftStaffId] = useState<string>('');
+  const [shiftCalendarMonth, setShiftCalendarMonth] = useState(new Date().getMonth());
+  const [shiftCalendarYear, setShiftCalendarYear] = useState(new Date().getFullYear());
   const [showRSVPPanel, setShowRSVPPanel] = useState<string | null>(null);
 
   // Load and apply local data and parameter hooks
@@ -2338,6 +2344,21 @@ export default function App() {
     setCurrentYear(nextY);
   };
 
+  // Shift staff calendar month independently
+  const shiftStaffCalendarMonth = (direction: number) => {
+    let nextM = shiftCalendarMonth + direction;
+    let nextY = shiftCalendarYear;
+    if (nextM < 0) {
+      nextM = 11;
+      nextY -= 1;
+    } else if (nextM > 11) {
+      nextM = 0;
+      nextY += 1;
+    }
+    setShiftCalendarMonth(nextM);
+    setShiftCalendarYear(nextY);
+  };
+
   const getMonthName = (monthIdx: number) => {
     const months = [
       'January', 'February', 'March', 'April', 'May', 'June',
@@ -2543,8 +2564,8 @@ export default function App() {
       const eClean = ev.endTime.replace(/:/g, '') + '00';
 
       icsContent += 'BEGIN:VEVENT\n';
-      icsContent += `DTSTART;TZID=Europe/Paris:${dClean}T${sClean}\n`;
-      icsContent += `DTEND;TZID=Europe/Paris:${dClean}T${eClean}\n`;
+      icsContent += `DTSTART;TZID=Africa/Johannesburg:${dClean}T${sClean}\n`;
+      icsContent += `DTEND;TZID=Africa/Johannesburg:${dClean}T${eClean}\n`;
       icsContent += `SUMMARY:${ev.title}\n`;
       icsContent += `LOCATION:${venueName}\n`;
       icsContent += `DESCRIPTION:Fresh People Event scheduling Client: ${clientName}. Notes: ${ev.notes || 'None'}\n`;
@@ -3175,6 +3196,22 @@ export default function App() {
               )}
             </div>
           </div>
+
+          {/* Staff Shift Calendar */}
+          <Suspense fallback={<div className="glass-panel rounded-lg p-5 shadow-luxury-glow"><div className="text-[10px] text-slate-400 text-center py-4">Loading shift calendar...</div></div>}>
+            <StaffShiftCalendar
+              staff={staff}
+              events={events}
+              clients={clients}
+              venues={venues}
+              selectedStaffId={selectedShiftStaffId}
+              onSelectStaff={setSelectedShiftStaffId}
+              month={shiftCalendarMonth}
+              year={shiftCalendarYear}
+              onShiftMonth={shiftStaffCalendarMonth}
+              getMonthName={getMonthName}
+            />
+          </Suspense>
 
           {/* Role Utilization Dashboard widget */}
           <div className="glass-panel rounded-lg p-5 shadow-luxury-glow flex flex-col">
