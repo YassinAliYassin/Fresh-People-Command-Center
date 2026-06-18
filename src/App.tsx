@@ -1151,6 +1151,12 @@ export default function App() {
   // Mobile menu state
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Event search/filter states
+  const [eventSearchQuery, setEventSearchQuery] = useState('');
+  const [eventStatusFilter, setEventStatusFilter] = useState<'all' | 'Pending' | 'Confirmed' | 'Canceled'>('all');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [showRSVPPanel, setShowRSVPPanel] = useState<string | null>(null);
+
   // Load and apply local data and parameter hooks
   useEffect(() => {
     // Check local storage or seed, force-migrating to South Africa Johannesburg setup
@@ -1737,9 +1743,6 @@ export default function App() {
 
   // Delete scheduled event + remove from Google Calendar sync ID references
   const deleteEvent = async (id: string) => {
-    const confirmation = window.confirm('Are you strictly sure you want to delete this event across all logs?');
-    if (!confirmation) return;
-
     const target = events.find((ev) => ev.id === id);
     if (!target) return;
 
@@ -1748,6 +1751,9 @@ export default function App() {
     setEvents(filtered);
     localStorage.setItem('fp_events', JSON.stringify(filtered));
     addActivityLog('event_delete', `Deleted event record for "${target.title}" on date ${target.date}.`);
+
+    // Close delete confirm modal
+    setShowDeleteConfirm(null);
 
     // Remove from Google Calendar if matched
     const token = await getAccessToken();
@@ -3652,13 +3658,58 @@ export default function App() {
                 </button>
               </div>
 
+              {/* Search and Filter Bar */}
+              {selectedDayEvents.length > 0 && (
+                <div className="flex flex-col sm:flex-row gap-2">
+                  {/* Search Input */}
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      placeholder="Search events..."
+                      value={eventSearchQuery}
+                      onChange={(e) => setEventSearchQuery(e.target.value)}
+                      className="w-full bg-white border border-slate-200 text-[10px] text-slate-900 px-3 py-1.5 pl-7 rounded focus:border-gold-500 focus:outline-none placeholder-slate-400 font-medium"
+                    />
+                    <svg className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  </div>
+                  {/* Status Filter */}
+                  <select
+                    value={eventStatusFilter}
+                    onChange={(e) => setEventStatusFilter(e.target.value as any)}
+                    className="bg-white border border-slate-200 text-[10px] text-slate-700 px-2 py-1.5 rounded focus:border-gold-500 focus:outline-none font-bold cursor-pointer"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="Confirmed">Confirmed</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Canceled">Canceled</option>
+                  </select>
+                  {/* Clear filters */}
+                  {(eventSearchQuery || eventStatusFilter !== 'all') && (
+                    <button
+                      onClick={() => { setEventSearchQuery(''); setEventStatusFilter('all'); }}
+                      className="text-[8px] text-slate-500 hover:text-red-600 border border-slate-200 hover:border-red-300 px-2 py-1 rounded transition-all font-mono uppercase tracking-widest font-bold bg-white cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              )}
+
               {selectedDayEvents.length === 0 ? (
                 <div className="text-center py-6 text-slate-500 text-xs border border-dashed border-slate-200 bg-white/50 rounded-lg font-medium">
                   No operational mappings budgeted on this calendar date.
                 </div>
               ) : (
                 <div className="space-y-3 max-h-[190px] overflow-y-auto pr-1">
-                  {selectedDayEvents.map((ev) => {
+                  {selectedDayEvents
+                    .filter((ev) => {
+                      const matchesSearch = !eventSearchQuery || 
+                        ev.title.toLowerCase().includes(eventSearchQuery.toLowerCase()) ||
+                        ev.notes.toLowerCase().includes(eventSearchQuery.toLowerCase());
+                      const matchesStatus = eventStatusFilter === 'all' || ev.status === eventStatusFilter;
+                      return matchesSearch && matchesStatus;
+                    })
+                    .map((ev) => {
                     const clientObj = clients.find((c) => c.id === ev.clientId);
                     const venueObj = venues.find((v) => v.id === ev.venueId);
                     const isGoogleImport = ev.id.startsWith('gcal-import');
@@ -3732,12 +3783,39 @@ export default function App() {
                             </div>
                           )}
 
+                          {/* Event Status Badge */}
+                          {ev.status && !isGoogleImport && !isAppleImport && (
+                            <div className="mt-2 flex items-center gap-1.5">
+                              <span className="text-[8px] text-slate-500 uppercase tracking-widest font-bold">Status:</span>
+                              <span className={`text-[8px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded font-bold border ${
+                                ev.status === 'Confirmed'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : ev.status === 'Canceled'
+                                  ? 'bg-red-50 text-red-700 border-red-200'
+                                  : 'bg-amber-50 text-amber-700 border-amber-200'
+                              }`}>
+                                {ev.status}
+                              </span>
+                            </div>
+                          )}
+
                           <div className="flex items-center justify-between mt-3.5 pt-2.5 border-t border-slate-100">
                             <p className="text-[9px] text-slate-500 italic truncate max-w-[80%] font-medium">
                               Brand Note: {ev.notes || 'No directive guidelines.'}
                             </p>
                             {!isGoogleImport && !isAppleImport && (
                               <div className="flex items-center gap-2">
+                                {ev.staffIds.length > 0 && (
+                                  <>
+                                    <button
+                                      onClick={() => setShowRSVPPanel(showRSVPPanel === ev.id ? null : ev.id)}
+                                      className="text-[8.5px] text-blue-600 hover:text-blue-500 hover:underline transition-all font-mono font-bold cursor-pointer"
+                                    >
+                                      RSVP ({ev.staffIds.length})
+                                    </button>
+                                    <span className="text-slate-300">|</span>
+                                  </>
+                                )}
                                 <button
                                   onClick={() => handleEditEvent(ev)}
                                   className="text-[8.5px] text-gold-700 hover:text-gold-600 hover:underline transition-all font-mono font-bold cursor-pointer"
@@ -3746,7 +3824,7 @@ export default function App() {
                                 </button>
                                 <span className="text-slate-300">|</span>
                                 <button
-                                  onClick={() => deleteEvent(ev.id)}
+                                  onClick={() => setShowDeleteConfirm(ev.id)}
                                   className="text-[8.5px] text-red-650 hover:text-red-500 hover:underline transition-all font-mono font-bold cursor-pointer"
                                 >
                                   Delete
@@ -3754,6 +3832,103 @@ export default function App() {
                               </div>
                             )}
                           </div>
+
+                          {/* RSVP Management Panel */}
+                          {showRSVPPanel === ev.id && !isGoogleImport && !isAppleImport && (
+                            <div className="mt-3 pt-3 border-t border-slate-200 bg-slate-50/50 -mx-3 -mb-3 px-3 pb-3 rounded-b-lg">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-[8px] text-slate-600 uppercase tracking-widest font-bold">Staff RSVP Management</span>
+                                <button
+                                  onClick={() => setShowRSVPPanel(null)}
+                                  className="text-[8px] text-slate-400 hover:text-slate-600 cursor-pointer"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                              <div className="space-y-1.5">
+                                {ev.staffIds.map((sId) => {
+                                  const sObj = staff.find((s) => s.id === sId);
+                                  if (!sObj) return null;
+                                  const rsvpState = ev.staffRSVPs?.[sId] || (ev.isDirectBooking ? 'Available' : 'Pending');
+                                  return (
+                                    <div key={sId} className="flex items-center justify-between bg-white border border-slate-200 rounded px-2 py-1.5">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[9px] text-slate-800 font-bold">{sObj.name} {sObj.surname[0]}.</span>
+                                        <span className={`text-[7px] font-mono uppercase tracking-widest px-1 py-0.5 rounded font-bold border ${
+                                          rsvpState === 'Available'
+                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                            : rsvpState === 'Unavailable'
+                                            ? 'bg-red-50 text-red-700 border-red-200'
+                                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                                        }`}>
+                                          {rsvpState}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          onClick={() => {
+                                            const updatedEvents = events.map((e) => {
+                                              if (e.id !== ev.id) return e;
+                                              const currentRSVPs = e.staffRSVPs || {};
+                                              return { ...e, staffRSVPs: { ...currentRSVPs, [sId]: 'Available' as const } };
+                                            });
+                                            setEvents(updatedEvents);
+                                            localStorage.setItem('fp_events', JSON.stringify(updatedEvents));
+                                            addActivityLog('staff_reply', `Operator marked ${sObj.name} as Available for "${ev.title}".`);
+                                          }}
+                                          className={`text-[7px] px-1.5 py-0.5 rounded font-bold cursor-pointer border transition-all ${
+                                            rsvpState === 'Available'
+                                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                              : 'bg-white text-slate-500 border-slate-200 hover:border-emerald-300 hover:text-emerald-700'
+                                          }`}
+                                        >
+                                          ✓ Available
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            const updatedEvents = events.map((e) => {
+                                              if (e.id !== ev.id) return e;
+                                              const currentRSVPs = e.staffRSVPs || {};
+                                              return { ...e, staffRSVPs: { ...currentRSVPs, [sId]: 'Pending' as const } };
+                                            });
+                                            setEvents(updatedEvents);
+                                            localStorage.setItem('fp_events', JSON.stringify(updatedEvents));
+                                            addActivityLog('staff_reply', `Operator marked ${sObj.name} as Pending for "${ev.title}".`);
+                                          }}
+                                          className={`text-[7px] px-1.5 py-0.5 rounded font-bold cursor-pointer border transition-all ${
+                                            rsvpState === 'Pending'
+                                              ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                              : 'bg-white text-slate-500 border-slate-200 hover:border-amber-300 hover:text-amber-700'
+                                          }`}
+                                        >
+                                          ⌛ Pending
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            const updatedEvents = events.map((e) => {
+                                              if (e.id !== ev.id) return e;
+                                              const currentRSVPs = e.staffRSVPs || {};
+                                              return { ...e, staffRSVPs: { ...currentRSVPs, [sId]: 'Unavailable' as const } };
+                                            });
+                                            setEvents(updatedEvents);
+                                            localStorage.setItem('fp_events', JSON.stringify(updatedEvents));
+                                            addActivityLog('staff_reply', `Operator marked ${sObj.name} as Unavailable for "${ev.title}".`);
+                                          }}
+                                          className={`text-[7px] px-1.5 py-0.5 rounded font-bold cursor-pointer border transition-all ${
+                                            rsvpState === 'Unavailable'
+                                              ? 'bg-red-100 text-red-800 border-red-300'
+                                              : 'bg-white text-slate-500 border-slate-200 hover:border-red-300 hover:text-red-700'
+                                          }`}
+                                        >
+                                          ✗ Unavailable
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -4980,6 +5155,40 @@ export default function App() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+          <div className="w-full max-w-sm p-6 glass-panel rounded-lg shadow-2xl bg-white/95 border border-red-200/40 fade-in-up">
+            <div className="text-center mb-4">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-50 border border-red-200 mb-4">
+                <Trash2 className="w-6 h-6 text-red-500" />
+              </div>
+              <h3 className="font-display text-sm tracking-[0.15em] text-slate-900 font-bold uppercase">Confirm Deletion</h3>
+              <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">
+                Are you sure you want to permanently delete this event? This action cannot be undone and will remove the event from all logs.
+              </p>
+            </div>
+            <div className="flex space-x-2 pt-2 text-[9px] uppercase tracking-wider font-extrabold font-mono">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(null)}
+                className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg cursor-pointer transition-all border border-slate-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteEvent(showDeleteConfirm)}
+                className="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1.5"
+              >
+                <Trash2 className="w-3 h-3" />
+                Delete Event
+              </button>
+            </div>
           </div>
         </div>
       )}
