@@ -6,3 +6,4 @@ coverage/
 *.log
 .env*
 !.env.example
+cf_check.sh

@@ -1129,6 +1129,7 @@ export default function App() {
   const [evNotes, setEvNotes] = useState('');
   const [evClientRequirements, setEvClientRequirements] = useState('');
   const [evSelectedStaffIds, setEvSelectedStaffIds] = useState<string[]>([]);
+  const [evStatus, setEvStatus] = useState<'Pending' | 'Confirmed' | 'Canceled'>('Pending');
 
   // Edit mode state
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -1518,7 +1519,7 @@ export default function App() {
         staffIds: evSelectedStaffIds,
         notes: evNotes,
         clientRequirements: evClientRequirements,
-        status: isDirectBookingChecked ? 'Confirmed' : (existingEvent.status === 'Confirmed' ? 'Confirmed' : 'Pending'),
+        status: evStatus,
         isDirectBooking: isDirectBookingChecked,
         staffRSVPs: rsvps,
       };
@@ -1615,7 +1616,7 @@ export default function App() {
       staffIds: evSelectedStaffIds,
       notes: evNotes,
       clientRequirements: evClientRequirements,
-      status: isDirectBookingChecked ? 'Confirmed' : 'Pending',
+      status: evStatus,
       isDirectBooking: isDirectBookingChecked,
       staffRSVPs: rsvps
     };
@@ -1677,6 +1678,7 @@ export default function App() {
     setEvNotes('');
     setEvClientRequirements('');
     setEvSelectedStaffIds([]);
+    setEvStatus('Pending');
     setIsDirectBookingChecked(false);
     setEvClient('');
     setEvVenue('');
@@ -1697,6 +1699,7 @@ export default function App() {
     setEvNotes(event.notes || '');
     setEvClientRequirements(event.clientRequirements || '');
     setEvSelectedStaffIds(event.staffIds || []);
+    setEvStatus(event.status || 'Pending');
     setIsDirectBookingChecked(event.isDirectBooking || false);
     setSelectedDateStr(event.date);
     // Scroll to the Event Architect form
@@ -1710,6 +1713,25 @@ export default function App() {
   const handleCancelEdit = () => {
     setEditingEventId(null);
     resetEventForm();
+  };
+
+  // Quick status cycle: Pending → Confirmed → Canceled → Pending
+  const STATUS_CYCLE: ('Pending' | 'Confirmed' | 'Canceled')[] = ['Pending', 'Confirmed', 'Canceled'];
+  const handleQuickStatusChange = (eventId: string) => {
+    const updatedEvents = events.map((e) => {
+      if (e.id === eventId) {
+        const currentIdx = STATUS_CYCLE.indexOf(e.status || 'Pending');
+        const nextStatus = STATUS_CYCLE[(currentIdx + 1) % STATUS_CYCLE.length];
+        return { ...e, status: nextStatus };
+      }
+      return e;
+    });
+    setEvents(updatedEvents);
+    localStorage.setItem('fp_events', JSON.stringify(updatedEvents));
+    const ev = updatedEvents.find(e => e.id === eventId);
+    if (ev) {
+      addActivityLog('event_create', `Status changed: "${ev.title}" → ${ev.status}`);
+    }
   };
 
   // Toggle/Override individual RSVP status manually from the audit engine
@@ -2687,6 +2709,30 @@ export default function App() {
     document.body.removeChild(link);
   };
 
+  // JSON Data Backup Exporter
+  const handleExportJSON = () => {
+    const backupData = {
+      exportDate: new Date().toISOString(),
+      version: '1.0',
+      events,
+      clients,
+      venues,
+      staff,
+      activityLogs,
+    };
+    const jsonStr = JSON.stringify(backupData, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
+    const link = document.createElement('a');
+    const timestamp = new Date().toISOString().split('T')[0];
+    link.href = URL.createObjectURL(blob);
+    link.download = `fresh-people-backup-${timestamp}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addActivityLog('sync', `Full data backup exported (${events.length} events, ${clients.length} clients, ${staff.length} staff).`);
+    showToast(`Backup exported: ${events.length} events, ${clients.length} clients, ${staff.length} staff, ${venues.length} venues.`, 'success');
+  };
+
   // Authenticated Gateway form render
   if (!isUnlocked) {
     return (
@@ -2964,6 +3010,13 @@ export default function App() {
               className="py-1.5 px-3.5 border border-gold-300/30 text-gold-800 font-mono text-[9px] uppercase tracking-widest hover:bg-gold-50 transition-all rounded flex items-center gap-1.5 cursor-pointer font-bold bg-gold-50/50"
             >
               <CreditCard className="w-3 h-3 text-gold-600" /> Export Payroll &bull; {payrollCycleBounds.label} (.CSV)
+            </button>
+            <button
+              onClick={handleExportJSON}
+              id="export_json_backup_trigger"
+              className="py-1.5 px-3.5 border border-blue-200 hover:border-blue-400 text-blue-700 font-mono text-[9px] uppercase tracking-widest hover:bg-blue-50 transition-all rounded flex items-center gap-1.5 cursor-pointer font-bold bg-blue-50/50"
+            >
+              <Download className="w-3 h-3 text-blue-600" /> Full Backup (.JSON)
             </button>
           </div>
         </div>
@@ -3338,6 +3391,21 @@ export default function App() {
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* Event Status */}
+              <div className="space-y-1">
+                <label htmlFor="select_ev_status" className="text-[8px] text-slate-505 uppercase tracking-widest block font-bold">Event Status</label>
+                <select
+                  id="select_ev_status"
+                  value={evStatus}
+                  onChange={(e) => setEvStatus(e.target.value as 'Pending' | 'Confirmed' | 'Canceled')}
+                  className="w-full bg-white border border-slate-300 text-xs text-slate-900 px-2 py-2 rounded focus:border-gold-500 focus:outline-hidden cursor-pointer font-bold"
+                >
+                  <option value="Pending" className="bg-white text-slate-900">⏳ Pending</option>
+                  <option value="Confirmed" className="bg-white text-slate-900">✅ Confirmed</option>
+                  <option value="Canceled" className="bg-white text-slate-900">❌ Canceled</option>
+                </select>
               </div>
 
               {/* Direct Booking Manual Setup */}
@@ -3778,6 +3846,20 @@ export default function App() {
                                   </>
                                 )}
                                 <button
+                                  onClick={() => handleQuickStatusChange(ev.id)}
+                                  className={`text-[8.5px] hover:underline transition-all font-mono font-bold cursor-pointer ${
+                                    ev.status === 'Confirmed'
+                                      ? 'text-emerald-600 hover:text-emerald-500'
+                                      : ev.status === 'Canceled'
+                                      ? 'text-red-500 hover:text-red-400'
+                                      : 'text-amber-600 hover:text-amber-500'
+                                  }`}
+                                  title="Click to cycle: Pending → Confirmed → Canceled"
+                                >
+                                  {ev.status === 'Confirmed' ? '✓ Confirmed' : ev.status === 'Canceled' ? '✗ Canceled' : '⏳ Pending'}
+                                </button>
+                                <span className="text-slate-300">|</span>
+                                <button
                                   onClick={() => handleEditEvent(ev)}
                                   className="text-[8.5px] text-gold-700 hover:text-gold-600 hover:underline transition-all font-mono font-bold cursor-pointer"
                                 >
@@ -4032,7 +4114,7 @@ export default function App() {
             <span className="text-[10px] uppercase tracking-[0.2em] text-slate-800 font-display flex items-center gap-1.5 mb-3 border-b border-slate-205 pb-2 font-bold select-none">
               <Sparkles className="w-4 h-4 text-gold-600 animate-pulse" /> Operations Snapshot
             </span>
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-3 gap-2.5">
               {/* Total Events */}
               <div className="bg-white border border-slate-200/60 rounded-md p-2.5 text-center">
                 <span className="text-[18px] font-extrabold text-slate-900 font-mono leading-none block">{events.length}</span>
@@ -4052,6 +4134,11 @@ export default function App() {
               <div className="bg-amber-50/60 border border-amber-200/60 rounded-md p-2.5 text-center">
                 <span className="text-[18px] font-extrabold text-amber-700 font-mono leading-none block">{events.filter(e => e.status === 'Pending' || !e.status).length}</span>
                 <span className="text-[7px] text-amber-600 uppercase tracking-widest font-bold mt-1 block">Pending</span>
+              </div>
+              {/* Canceled */}
+              <div className="bg-red-50/60 border border-red-200/60 rounded-md p-2.5 text-center">
+                <span className="text-[18px] font-extrabold text-red-700 font-mono leading-none block">{events.filter(e => e.status === 'Canceled').length}</span>
+                <span className="text-[7px] text-red-600 uppercase tracking-widest font-bold mt-1 block">Canceled</span>
               </div>
             </div>
             {/* Upcoming Events (next 7 days) */}
