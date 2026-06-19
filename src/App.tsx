@@ -11,7 +11,6 @@ import {
   CalendarDays,
   User,
   Users,
-  MapPin,
   CreditCard,
   ChevronLeft,
   ChevronRight,
@@ -50,6 +49,8 @@ import {
 import { OperationsSnapshot } from './components/OperationsSnapshot';
 import { EventCard } from './components/EventCard';
 import StaffTimeline from './components/StaffTimeline';
+import MasterRegistry from './components/MasterRegistry';
+import ActivityLogPanel from './components/ActivityLogPanel';
 
 const RoleChart = lazy(() => import('./components/RoleChart'));
 const StaffShiftCalendar = lazy(() => import('./components/StaffShiftCalendar'));
@@ -1207,8 +1208,7 @@ export default function App() {
   const [shiftCalendarMonth, setShiftCalendarMonth] = useState(new Date().getMonth());
   const [shiftCalendarYear, setShiftCalendarYear] = useState(new Date().getFullYear());
   const [showRSVPPanel, setShowRSVPPanel] = useState<string | null>(null);
-  const [logSearchQuery, setLogSearchQuery] = useState('');
-  const [logTypeFilter, setLogTypeFilter] = useState<'all' | 'auth' | 'event_create' | 'event_delete' | 'sync' | 'direct_booking' | 'call' | 'staff_reply'>('all');
+
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 
   // Force-create conflict confirmation state
@@ -3407,135 +3407,16 @@ export default function App() {
         >
 
           {/* Master Directories Selection Box */}
-          <div className="glass-panel rounded-lg p-5 shadow-luxury-glow flex flex-col">
-            <div className="border-b border-slate-200/60 pb-3 mb-4">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[10px] uppercase tracking-[0.2em] text-slate-700 font-display flex items-center gap-1.5 font-bold">
-                  <Users className="w-4 h-4 text-gold-600 animate-pulse" /> Master Registries
-                </span>
-                <span className="font-mono text-[8px] px-2 py-0.5 bg-gold-50 border border-gold-200/40 rounded-full text-gold-700 uppercase tracking-widest font-bold">
-                  Active Dir
-                </span>
-              </div>
-              <div className="flex space-x-2 bg-slate-100/60 p-1 rounded border border-slate-200/40">
-                <button
-                  onClick={() => switchTab('clients')}
-                  className={`flex-1 py-1.5 text-center text-[10px] font-bold cursor-pointer rounded transition-all tracking-widest uppercase ${
-                    activeTab === 'clients' ? 'text-gold-700 bg-white border border-gold-200/50 shadow-xs' : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  Clients ({clients.length})
-                </button>
-                <button
-                  onClick={() => switchTab('venues')}
-                  className={`flex-1 py-1.5 text-center text-[10px] font-bold cursor-pointer rounded transition-all tracking-widest uppercase ${
-                    activeTab === 'venues' ? 'text-gold-700 bg-white border border-gold-200/50 shadow-xs' : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  Venues ({venues.length})
-                </button>
-                <button
-                  onClick={() => switchTab('staff')}
-                  className={`flex-1 py-1.5 text-center text-[10px] font-bold cursor-pointer rounded transition-all tracking-widest uppercase ${
-                    activeTab === 'staff' ? 'text-gold-700 bg-white border border-gold-200/50 shadow-xs' : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  Staff ({staff.length})
-                </button>
-              </div>
-            </div>
-
-            {/* List details container */}
-            <div className="overflow-y-auto max-h-[220px] space-y-3.5 pr-1" id="registry_scroll_viewport">
-              {activeTab === 'clients' && (
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-[9px] text-slate-705 uppercase tracking-widest font-bold block">Client Accounts</span>
-                    <button
-                      onClick={() => setActiveModal('client')}
-                      className="text-[8px] text-gold-700 border border-gold-300 hover:border-gold-500 hover:bg-gold-50/55 px-2.5 py-1 rounded transition-all font-mono font-bold"
-                    >
-                      + Ingest Client
-                    </button>
-                  </div>
-                  {clients.length === 0 ? (
-                    <div className="text-[10px] text-slate-400 text-center py-4">No clients registered.</div>
-                  ) : (
-                    clients.map((c) => (
-                      <div key={c.id} className="p-3 bg-white border border-slate-200/60 rounded-md hover:border-gold-500/35 transition-all shadow-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-slate-800 tracking-wide font-bold">{c.name}</span>
-                          <span className="text-[8px] uppercase tracking-widest px-1.5 py-0.5 bg-gold-50 text-gold-700 font-bold border border-gold-200/40 rounded">Premium Account</span>
-                        </div>
-                        <p className="text-[9px] text-slate-600 mt-1 font-medium">Contact: {c.contact} &bull; {c.phone}</p>
-                        {c.notes && <p className="text-[9px] text-slate-600 italic mt-1 bg-slate-50 border border-slate-100 p-1.5 rounded">{c.notes}</p>}
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-
-              {activeTab === 'venues' && (
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-[9px] text-slate-705 uppercase tracking-widest font-bold block">Indexed Venues</span>
-                    <button
-                      onClick={() => setActiveModal('venue')}
-                      className="text-[8px] text-gold-700 border border-gold-300 hover:border-gold-500 hover:bg-gold-50/55 px-2.5 py-1 rounded transition-all font-mono font-bold"
-                    >
-                      + Index Venue
-                    </button>
-                  </div>
-                  {venues.length === 0 ? (
-                    <div className="text-[10px] text-slate-400 text-center py-4">No venues indexed.</div>
-                  ) : (
-                    venues.map((v) => (
-                      <div key={v.id} className="p-3 bg-white border border-slate-200/60 rounded-md hover:border-gold-500/35 transition-all shadow-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-slate-800 tracking-wide font-bold">{v.name}</span>
-                          <span className="text-[8px] uppercase tracking-widest px-1.5 py-0.5 bg-slate-100 text-slate-600 font-bold border border-slate-205 rounded">{v.tier}</span>
-                        </div>
-                        <p className="text-[9px] text-slate-600 mt-1 flex items-center gap-1 font-medium">
-                          <MapPin className="w-3 h-3 text-gold-500" />
-                          <span>{v.address}</span>
-                        </p>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-
-              {activeTab === 'staff' && (
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-[9px] text-slate-705 uppercase tracking-widest font-bold block">Vetted Agency Staff</span>
-                    <button
-                      onClick={() => setActiveModal('staff')}
-                      className="text-[8px] text-gold-700 border border-gold-300 hover:border-gold-500 hover:bg-gold-50/55 px-2.5 py-1 rounded transition-all font-mono font-bold"
-                    >
-                      + Register Staff
-                    </button>
-                  </div>
-                  {staff.length === 0 ? (
-                    <div className="text-[10px] text-slate-400 text-center py-4">No staff members enrolled.</div>
-                  ) : (
-                    staff.map((s) => (
-                      <div key={s.id} className="p-3 bg-white border border-slate-200/60 rounded-md hover:border-gold-500/35 transition-all shadow-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-slate-800 font-bold">{s.name} {s.surname}</span>
-                          <span className="text-[8.5px] uppercase tracking-widest px-1.5 py-0.5 bg-gold-50 text-gold-700 font-bold border border-gold-200/40 rounded italic">{s.role}</span>
-                        </div>
-                        <div className="flex justify-between items-center mt-1 text-[9px] text-slate-600 font-mono font-semibold">
-                          <span>Rate: R{s.rate}/h</span>
-                          <span>{s.phone}</span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+          <MasterRegistry
+            activeTab={activeTab}
+            switchTab={switchTab}
+            clients={clients}
+            venues={venues}
+            staff={staff}
+            onAddClient={() => setActiveModal('client')}
+            onAddVenue={() => setActiveModal('venue')}
+            onAddStaff={() => setActiveModal('staff')}
+          />
 
           {/* Staff Shift Calendar */}
           <Suspense fallback={<div className="glass-panel rounded-lg p-5 shadow-luxury-glow"><div className="text-[10px] text-slate-400 text-center py-4">Loading shift calendar...</div></div>}>
@@ -5043,93 +4924,10 @@ export default function App() {
           </div>
 
           {/* Activity Pipeline Logs */}
-          <div className="glass-panel rounded-lg p-5 shadow-luxury-glow flex flex-col min-h-[160px] max-h-[220px]">
-            <div className="flex items-center justify-between mb-3 border-b border-slate-205 pb-2">
-              <span className="text-[10px] uppercase tracking-[0.15em] text-slate-800 font-display flex items-center gap-1.5 font-bold">
-                <ScrollText className="w-4 h-4 text-gold-600 animate-pulse" /> Operational Pipeline Buffer
-              </span>
-              <button
-                onClick={clearLogs}
-                className="text-[8px] text-slate-500 hover:text-red-500 transition-all font-mono uppercase tracking-widest font-bold cursor-pointer"
-              >
-                Flush Logs
-              </button>
-            </div>
-
-            {/* Search and Filter Bar */}
-            <div className="flex gap-1.5 mb-2">
-              <input
-                type="text"
-                placeholder="Search logs..."
-                value={logSearchQuery}
-                onChange={(e) => setLogSearchQuery(e.target.value)}
-                className="flex-1 bg-white border border-slate-200 text-[9px] text-slate-900 px-2 py-1 rounded focus:border-gold-500 focus:outline-none placeholder-slate-400 font-medium"
-              />
-              <select
-                value={logTypeFilter}
-                onChange={(e) => setLogTypeFilter(e.target.value as any)}
-                className="bg-white border border-slate-200 text-[9px] text-slate-700 px-1.5 py-1 rounded focus:border-gold-500 focus:outline-none font-bold cursor-pointer"
-              >
-                <option value="all">All Types</option>
-                <option value="auth">Auth</option>
-                <option value="event_create">Events</option>
-                <option value="event_delete">Deletions</option>
-                <option value="sync">Sync</option>
-                <option value="direct_booking">Bookings</option>
-                <option value="call">Calls</option>
-                <option value="staff_reply">RSVP</option>
-              </select>
-              {(logSearchQuery || logTypeFilter !== 'all') && (
-                <button
-                  onClick={() => { setLogSearchQuery(''); setLogTypeFilter('all'); }}
-                  className="text-[8px] text-slate-500 hover:text-red-600 border border-slate-200 hover:border-red-300 px-1.5 py-1 rounded transition-all font-mono uppercase tracking-widest font-bold bg-white cursor-pointer"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-
-            <div id="activity_feed_box" className="flex-1 overflow-y-auto space-y-3.5 pr-1 font-mono text-[9px] text-slate-700 leading-relaxed select-all font-semibold">
-              {activityLogs
-                .filter(log => {
-                  const matchesSearch = !logSearchQuery ||
-                    log.message.toLowerCase().includes(logSearchQuery.toLowerCase()) ||
-                    log.operator.toLowerCase().includes(logSearchQuery.toLowerCase()) ||
-                    log.type.toLowerCase().includes(logSearchQuery.toLowerCase());
-                  const matchesType = logTypeFilter === 'all' || log.type === logTypeFilter;
-                  return matchesSearch && matchesType;
-                })
-                .map((log, index) => (
-                <div key={`${log.id}-${index}`} className="relative pl-3.5 border-l border-slate-200 hover:border-gold-400 transition-all animate-fade-in">
-                  {/* Small pointer glyph for active logs */}
-                  <div
-                    className={`absolute left-[-2.5px] top-1 w-1.5 h-1.5 rounded-full ${
-                      log.isUrgent ? 'bg-red-550 animate-ping' : 'bg-gold-600/60'
-                    }`}
-                  ></div>
-                  <div className="flex justify-between text-[8px] text-slate-500 font-extrabold mb-0.5">
-                    <span>[{log.operator}] &bull; {log.type.toUpperCase()}</span>
-                    <span>{log.timestamp.split('T')[1].slice(0, 8)}</span>
-                  </div>
-                  <p className={`${log.isUrgent ? 'text-red-600 font-extrabold' : 'text-slate-800 font-bold'}`}>
-                    {log.message}
-                  </p>
-                </div>
-              ))}
-              {activityLogs.filter(log => {
-                const matchesSearch = !logSearchQuery ||
-                  log.message.toLowerCase().includes(logSearchQuery.toLowerCase()) ||
-                  log.operator.toLowerCase().includes(logSearchQuery.toLowerCase()) ||
-                  log.type.toLowerCase().includes(logSearchQuery.toLowerCase());
-                const matchesType = logTypeFilter === 'all' || log.type === logTypeFilter;
-                return matchesSearch && matchesType;
-              }).length === 0 && (
-                <div className="text-center py-4 text-slate-400 text-[10px] font-medium">
-                  {activityLogs.length === 0 ? 'No activity logs yet.' : 'No logs match your filter.'}
-                </div>
-              )}
-            </div>
-          </div>
+          <ActivityLogPanel
+            activityLogs={activityLogs}
+            onClearLogs={clearLogs}
+          />
 
         </section>
 
