@@ -26,6 +26,7 @@ export interface EventCardProps {
   setEvents: React.Dispatch<React.SetStateAction<Event[]>>;
   addActivityLog: (type: ActivityLog['type'], message: string) => void;
   toggleStaffRSVP: (eventId: string, staffId: string) => void;
+  onBulkRSVP?: (eventId: string, state: 'Available' | 'Unavailable') => void;
 }
 
 export function EventCard(props: EventCardProps & { key?: React.Key }) {
@@ -45,6 +46,7 @@ export function EventCard(props: EventCardProps & { key?: React.Key }) {
     setShowDeleteConfirm,
     setEvents,
     addActivityLog,
+    onBulkRSVP,
   } = props;
   const updateStaffRSVP = (sId: string, newState: 'Available' | 'Pending' | 'Unavailable') => {
     const sObj = staff.find((s) => s.id === sId);
@@ -200,12 +202,32 @@ export function EventCard(props: EventCardProps & { key?: React.Key }) {
           <div className="mt-3 pt-3 border-t border-slate-200 bg-slate-50/50 -mx-3 -mb-3 px-3 pb-3 rounded-b-lg">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[8px] text-slate-600 uppercase tracking-widest font-bold">Staff RSVP Management</span>
-              <button
-                onClick={() => setShowRSVPPanel(null)}
-                className="text-[8px] text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-1">
+                {onBulkRSVP && ev.staffIds.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => onBulkRSVP(ev.id, 'Available')}
+                      className="text-[7px] px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded font-bold cursor-pointer hover:bg-emerald-100 transition-all"
+                      title="Mark all staff as available"
+                    >
+                      ✓ All
+                    </button>
+                    <button
+                      onClick={() => onBulkRSVP(ev.id, 'Unavailable')}
+                      className="text-[7px] px-1.5 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded font-bold cursor-pointer hover:bg-red-100 transition-all"
+                      title="Mark all staff as unavailable"
+                    >
+                      ✗ All
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => setShowRSVPPanel(null)}
+                  className="text-[8px] text-slate-400 hover:text-slate-600 cursor-pointer ml-1"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
             <div className="space-y-1.5">
               {ev.staffIds.map((sId) => {

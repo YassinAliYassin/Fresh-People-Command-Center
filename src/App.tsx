@@ -1917,6 +1917,23 @@ export default function App() {
     addActivityLog('staff_reply', `Operator overridden RSVP status to ${updatedEvents.find(e => e.id === eventId)?.staffRSVPs?.[staffId]} for staffId ${staffId} on eventId ${eventId}.`);
   };
 
+  // Bulk RSVP update: mark all staff for an event as Available or Unavailable
+  const bulkUpdateRSVP = (eventId: string, state: 'Available' | 'Unavailable') => {
+    const updatedEvents = events.map((e) => {
+      if (e.id !== eventId) return e;
+      const currentRSVPs = e.staffRSVPs || {};
+      const nextRSVPs: Record<string, 'Available' | 'Pending' | 'Unavailable'> = {};
+      for (const sId of e.staffIds) {
+        nextRSVPs[sId] = state;
+      }
+      return { ...e, staffRSVPs: { ...currentRSVPs, ...nextRSVPs } };
+    });
+    setEvents(updatedEvents);
+    localStorage.setItem('fp_events', JSON.stringify(updatedEvents));
+    const staffCount = e.staffIds?.length || 0;
+    addActivityLog('staff_reply', `Bulk RSVP: marked ${staffCount} staff as ${state} for "${updatedEvents.find(e => e.id === eventId)?.title}".`);
+  };
+
   // Delete scheduled event + remove from Google Calendar sync ID references
   const deleteEvent = async (id: string) => {
     const target = events.find((ev) => ev.id === id);
@@ -4121,6 +4138,7 @@ export default function App() {
                         setEvents={setEvents}
                         addActivityLog={addActivityLog}
                         toggleStaffRSVP={toggleStaffRSVP}
+                        onBulkRSVP={bulkUpdateRSVP}
                       />
                     );
                   })}
