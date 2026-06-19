@@ -51,6 +51,8 @@ import { EventCard } from './components/EventCard';
 import StaffTimeline from './components/StaffTimeline';
 import MasterRegistry from './components/MasterRegistry';
 import ActivityLogPanel from './components/ActivityLogPanel';
+import { EventTemplatesPanel } from './components/EventTemplatesPanel';
+import { StaffAllocationChecklist } from './components/StaffAllocationChecklist';
 
 const RoleChart = lazy(() => import('./components/RoleChart'));
 const StaffShiftCalendar = lazy(() => import('./components/StaffShiftCalendar'));
@@ -3578,72 +3580,27 @@ export default function App() {
             </div>
 
             {/* Event Templates Panel */}
-            {showTemplatePanel && (
-              <div className="mb-4 p-3 bg-violet-50/50 border border-violet-200 rounded-lg space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[8px] text-violet-700 uppercase tracking-widest font-bold">Event Templates</span>
-                  <button
-                    type="button"
-                    onClick={() => setShowTemplatePanel(false)}
-                    className="text-[8px] text-violet-400 hover:text-violet-700 cursor-pointer"
-                  >✕</button>
-                </div>
-                {/* Save current form as template */}
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={templateName}
-                    onChange={(e) => setTemplateName(e.target.value)}
-                    placeholder="Template name..."
-                    className="flex-1 bg-white border border-violet-200 text-[10px] text-slate-900 px-2 py-1.5 rounded focus:border-violet-400 focus:outline-hidden placeholder-slate-400"
-                  />
-                  <button
-                    type="button"
-                    onClick={saveEventTemplate}
-                    className="text-[8px] px-3 py-1.5 bg-violet-600 text-white rounded font-bold uppercase tracking-wider hover:bg-violet-700 transition-all cursor-pointer"
-                  >
-                    Save Current
-                  </button>
-                </div>
-                {/* Template list */}
-                {eventTemplates.length === 0 ? (
-                  <p className="text-[9px] text-slate-400 italic">No templates yet. Fill the form above and save as template.</p>
-                ) : (
-                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                    {eventTemplates.map((tmpl) => {
-                      const clientObj = clients.find(c => c.id === tmpl.clientId);
-                      const venueObj = venues.find(v => v.id === tmpl.venueId);
-                      return (
-                        <div key={tmpl.id} className="flex items-center justify-between bg-white border border-violet-100 rounded px-2 py-1.5">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-[9px] font-bold text-slate-800 truncate">{tmpl.name}</span>
-                            <span className="text-[7px] text-slate-500 truncate">
-                              {clientObj?.name || '?'} @ {venueObj?.name || '?'} · {tmpl.startTime}-{tmpl.endTime} · {tmpl.staffIds.length} staff
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => applyEventTemplate(tmpl)}
-                              className="text-[7px] px-2 py-0.5 bg-violet-100 text-violet-700 rounded font-bold hover:bg-violet-200 transition-all cursor-pointer"
-                            >
-                              Apply
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => deleteEventTemplate(tmpl.id)}
-                              className="text-[7px] px-1.5 py-0.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded font-bold transition-all cursor-pointer"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
+            <EventTemplatesPanel
+              showTemplatePanel={showTemplatePanel}
+              setShowTemplatePanel={setShowTemplatePanel}
+              templateName={templateName}
+              setTemplateName={setTemplateName}
+              eventTemplates={eventTemplates}
+              clients={clients}
+              venues={venues}
+              evTitle={evTitle}
+              evClient={evClient}
+              evVenue={evVenue}
+              evTimeStart={evTimeStart}
+              evTimeEnd={evTimeEnd}
+              evSelectedStaffIds={evSelectedStaffIds}
+              evNotes={evNotes}
+              evClientRequirements={evClientRequirements}
+              isDirectBookingChecked={isDirectBookingChecked}
+              onSaveTemplate={saveEventTemplate}
+              onApplyTemplate={applyEventTemplate}
+              onDeleteTemplate={deleteEventTemplate}
+            />
 
             <form onSubmit={createEvent} className="space-y-4">
               <div className="space-y-1">
@@ -3765,38 +3722,11 @@ export default function App() {
               </div>
 
               {/* Core Feature 2: Allocation checklist directly mapped within created event */}
-              <div className="space-y-1">
-                <div className="flex justify-between items-center mb-1 animate-pulse">
-                  <label className="text-[8px] text-gold-700 uppercase tracking-widest font-bold block">Allocate Staff Members</label>
-                  <span className="text-[8px] font-mono text-slate-500 font-bold">{mappedRosterCount} Selected</span>
-                </div>
-                <div id="roster_checklist" className="max-h-24 overflow-y-auto border border-slate-200 bg-white shadow-xs rounded-md p-1.5 space-y-1.5 divide-y divide-slate-100">
-                  {staff.length === 0 ? (
-                    <div className="text-[9px] text-slate-400 text-center py-2">Add staff to enable dispatch maps.</div>
-                  ) : (
-                    staff.map((s) => {
-                      const isSelected = evSelectedStaffIds.includes(s.id);
-                      return (
-                        <div
-                          key={s.id}
-                          onClick={() => toggleStaffAllocation(s.id)}
-                          className="flex items-center space-x-2 py-1 cursor-pointer select-none text-[10px]"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            readOnly
-                            className="rounded text-gold-600 focus:ring-0 w-3 h-3 bg-white border-slate-300 cursor-pointer"
-                          />
-                          <span className={`flex-1 transition-all ${isSelected ? 'text-gold-700 font-bold' : 'text-slate-650'}`}>
-                            {s.name} {s.surname} ({s.role})
-                          </span>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
+              <StaffAllocationChecklist
+                staff={staff}
+                evSelectedStaffIds={evSelectedStaffIds}
+                onToggleStaff={toggleStaffAllocation}
+              />
 
               <div className="space-y-1">
                 <label htmlFor="textarea_ev_notes" className="text-[8px] text-slate-505 uppercase tracking-widest block font-bold">Brand Directives</label>
