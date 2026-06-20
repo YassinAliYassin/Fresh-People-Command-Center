@@ -52,6 +52,7 @@ import MasterRegistry from './components/MasterRegistry';
 import ActivityLogPanel from './components/ActivityLogPanel';
 import EventArchitect from './components/EventArchitect';
 import DispatchPanel from './components/DispatchPanel';
+import PayrollCalendar from './components/PayrollCalendar';
 
 const RoleChart = lazy(() => import('./components/RoleChart'));
 const StaffShiftCalendar = lazy(() => import('./components/StaffShiftCalendar'));
@@ -1199,9 +1200,6 @@ export default function App() {
   // Mobile menu state
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Event search/filter states
-  const [eventSearchQuery, setEventSearchQuery] = useState('');
-  const [eventStatusFilter, setEventStatusFilter] = useState<'all' | 'Pending' | 'Confirmed' | 'Canceled'>('all');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
   // Staff Shift Calendar states
@@ -2562,32 +2560,6 @@ export default function App() {
     return list;
   }, [staffBalancingData, balanceFilter, payrollCycleBounds]);
 
-  const isDayInSelectedPayrollCycle = (day: number) => {
-    // If we are looking at May (Month 4) on calendar:
-    // If focused cycle is "current" (Apr 26 - May 25), then May 1st to May 25th are inside this payroll cycle.
-    // If focused cycle is "next" (May 26 - Jun 25), then May 26th to May 31st are inside this payroll cycle.
-    if (focusedPayrollCycle === 'current') {
-      return day >= 1 && day <= 25;
-    } else {
-      return day >= 26 && day <= 31;
-    }
-  };
-
-  // Shifting active calendar months safely
-  const shiftMonth = (direction: number) => {
-    let nextM = currentMonth + direction;
-    let nextY = currentYear;
-    if (nextM < 0) {
-      nextM = 11;
-      nextY -= 1;
-    } else if (nextM > 11) {
-      nextM = 0;
-      nextY += 1;
-    }
-    setCurrentMonth(nextM);
-    setCurrentYear(nextY);
-  };
-
   // Shift staff calendar month independently
   const shiftStaffCalendarMonth = (direction: number) => {
     let nextM = shiftCalendarMonth + direction;
@@ -2611,135 +2583,8 @@ export default function App() {
     return months[monthIdx];
   };
 
-  // Generate calendar days for rendering
-  const calendarDays = useMemo(() => {
-    const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay();
-    const totalDaysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-
-    const days: { dayNumber: number; isCurrentMonth: boolean; dateStr: string }[] = [];
-
-    // Pads elements of the previous month
-    const prevMonthLastDate = new Date(currentYear, currentMonth, 0).getDate();
-    const prevMonthIdx = currentMonth === 0 ? 11 : currentMonth - 1;
-    const prevMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-
-    for (let i = firstDayIndex - 1; i >= 0; i--) {
-      const dNum = prevMonthLastDate - i;
-      days.push({
-        dayNumber: dNum,
-        isCurrentMonth: false,
-        dateStr: `${prevMonthYear}-${String(prevMonthIdx + 1).padStart(2, '0')}-${String(dNum).padStart(2, '0')}`
-      });
-    }
-
-    // Days of the primary month
-    for (let d = 1; d <= totalDaysInMonth; d++) {
-      days.push({
-        dayNumber: d,
-        isCurrentMonth: true,
-        dateStr: `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-      });
-    }
-
-    // Padding elements of the following month
-    const currentRenderedCount = days.length;
-    const remainingTo42 = 42 - currentRenderedCount;
-    const nextMonthIdx = currentMonth === 11 ? 0 : currentMonth + 1;
-    const nextMonthYear = currentMonth === 11 ? currentYear + 1 : currentYear;
-
-    for (let n = 1; n <= remainingTo42; n++) {
-      days.push({
-        dayNumber: n,
-        isCurrentMonth: false,
-        dateStr: `${nextMonthYear}-${String(nextMonthIdx + 1).padStart(2, '0')}-${String(n).padStart(2, '0')}`
-      });
-    }
-
-    return days;
-  }, [currentYear, currentMonth]);
-
-  // Aggregate local events scheduled on specific displayed days
-  const getEventsForDate = (dateStr: string) => {
-    const localMatches = events.filter((ev) => ev.date === dateStr);
-
-    // Merge Google calendar fetched appointments mapping to the same dateStr
-    const googleMatches = googleEvents
-      .filter((gEv) => {
-        // Parse date
-        const gDate = gEv.start?.dateTime?.split('T')[0] || gEv.start?.date;
-        return gDate === dateStr;
-      })
-      // Avoid duplication if the Google event stems from our own local event
-      .filter((gEv) => {
-        const fpId = gEv.extendedProperties?.private?.freshPeopleEventId;
-        return !events.some((e) => e.id === fpId || e.googleEventId === gEv.id);
-      })
-      .map((gEv) => {
-        const startTime = gEv.start?.dateTime ? gEv.start.dateTime.split('T')[1].slice(0, 5) : '00:00';
-        const endTime = gEv.end?.dateTime ? gEv.end.dateTime.split('T')[1].slice(0, 5) : '23:59';
-        const mapped: Event = {
-          id: `gcal-import-${gEv.id}`,
-          title: gEv.summary || 'Google Imported Event',
-          clientId: 'external_gcal',
-          venueId: 'external_gcal',
-          date: dateStr,
-          startTime,
-          endTime,
-          staffIds: [],
-          notes: gEv.description || 'Imported from connected Google calendar account.',
-          status: 'Confirmed'
-        };
-        return mapped;
-      });
-
-    // Merge Apple calendar fetched appointments mapping to the same dateStr
-    const appleMatches = appleUser
-      ? appleEvents
-          .filter((aEv) => aEv.date === dateStr)
-          // Hide duplicates that stem from local events (synchronized)
-          .filter((aEv) => !events.some((e) => e.id === aEv.appleEventId || e.appleEventId === aEv.id || e.id === aEv.id))
-          .map((aEv) => {
-            const matched = getMatchedClientAndVenue(aEv.title, aEv.clientId, aEv.venueId);
-            const mapped: Event = {
-              id: `apple-import-${aEv.id}`,
-              title: aEv.title,
-              clientId: matched.clientId,
-              venueId: matched.venueId,
-              date: dateStr,
-              startTime: aEv.startTime,
-              endTime: aEv.endTime,
-              staffIds: [],
-              notes: aEv.notes || 'Imported from linked Apple Calendar / iCloud account.',
-              clientRequirements: aEv.clientRequirements || '',
-              status: 'Confirmed'
-            };
-            return mapped;
-          })
-      : [];
-
-    return [...localMatches, ...googleMatches, ...appleMatches];
-  };
-
-  // Selected Day state actions
-  const selectedDayEvents = useMemo(() => {
-    return getEventsForDate(selectedDateStr);
-  }, [events, googleEvents, appleEvents, appleUser, selectedDateStr]);
-
-  const selectedDayDoubleShifts = useMemo(() => {
-    // Collect all local events for the selected date
-    const dailyEvents = events.filter((e) => e.date === selectedDateStr);
-    
-    // For each staff member, find which events they are scheduled on for that day
-    return staff.map((s) => {
-      const assignedEvents = dailyEvents.filter((e) => e.staffIds.includes(s.id));
-      return {
-        staff: s,
-        events: assignedEvents
-      };
-    }).filter((item) => item.events.length >= 2);
-  }, [events, selectedDateStr, staff]);
-
   // Conflict detection: find all staff-time overlaps across ALL events (not just same-day)
+  // Used by DispatchPanel for OperationsSnapshot conflict count
   const selectedDayConflicts = useMemo(() => {
     const conflicts: Array<{
       staffId: string;
@@ -2751,21 +2596,15 @@ export default function App() {
 
     const localEvents = events.filter(e => !e.id.startsWith('gcal-import') && !e.id.startsWith('apple-import') && !e.id.startsWith('apple-live'));
 
-    // Check every pair of events that share staff
     for (let i = 0; i < localEvents.length; i++) {
       for (let j = i + 1; j < localEvents.length; j++) {
         const evA = localEvents[i];
         const evB = localEvents[j];
-
-        // Find shared staff
         const sharedStaff = evA.staffIds.filter(id => evB.staffIds.includes(id));
         if (sharedStaff.length === 0) continue;
-
-        // Check time overlap
         const { start: startA, end: endA } = getEventDates(evA.date, evA.startTime, evA.endTime);
         const { start: startB, end: endB } = getEventDates(evB.date, evB.startTime, evB.endTime);
         const overlaps = startA < endB && startB < endA;
-
         if (overlaps) {
           sharedStaff.forEach(sId => {
             const sObj = staff.find(s => s.id === sId);
@@ -2782,23 +2621,6 @@ export default function App() {
     }
     return conflicts;
   }, [events, staff]);
-
-  // Filter conflicts for the selected day only
-  const selectedDayFilteredConflicts = useMemo(() => {
-    return selectedDayConflicts.filter(
-      c => c.eventA.date === selectedDateStr || c.eventB.date === selectedDateStr
-    );
-  }, [selectedDayConflicts, selectedDateStr]);
-
-  // Set of event IDs that have conflicts (for badge display)
-  const conflictingEventIds = useMemo(() => {
-    const ids = new Set<string>();
-    selectedDayFilteredConflicts.forEach(c => {
-      ids.add(c.eventA.id);
-      ids.add(c.eventB.id);
-    });
-    return ids;
-  }, [selectedDayFilteredConflicts]);
 
   // Handle click on staff checkboxes in scheduler
   const toggleStaffAllocation = (staffId: string) => {
@@ -3594,433 +3416,34 @@ export default function App() {
         {/* ========================================================================= */}
         {/* CENTER COLUMN: Interactive Payroll Grid Schedule                         */}
         {/* ========================================================================= */}
-        <section id="calendar_section" className="lg:col-span-4 flex flex-col space-y-6 animate-fade-in">
-
-          <div className="glass-panel rounded-lg p-5 shadow-luxury-glow flex flex-col flex-1 h-full">
-
-            {/* Calendar Controls */}
-            <div className="flex items-center justify-between mb-4 border-b border-slate-200/60 pb-3">
-              <div className="flex items-center space-x-2">
-                <Calendar className="w-4 h-4 text-gold-600 animate-pulse" />
-                <h2 className="font-display tracking-[0.15em] text-xs uppercase text-slate-900 font-extrabold">Payroll Cycle Schedule</h2>
-              </div>
-              <div className="flex items-center space-x-1.5 font-bold">
-                <button
-                  onClick={() => shiftMonth(-1)}
-                  className="p-1 text-slate-600 hover:text-gold-600 hover:bg-slate-100 rounded transition-all cursor-pointer"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <span className="font-display text-[11px] text-slate-900 font-bold uppercase tracking-widest px-1">
-                  {getMonthName(currentMonth)} {currentYear}
-                </span>
-                <button
-                  onClick={() => shiftMonth(1)}
-                  className="p-1 text-slate-600 hover:text-gold-600 hover:bg-slate-100 rounded transition-all cursor-pointer"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Core Feature 3: Quiet Luxury Corporate Payroll Highlight Panel */}
-            <div className="bg-gold-50/60 border border-gold-300/40 rounded-lg p-4 mb-4 space-y-2 relative overflow-hidden">
-              <div className="flex justify-between items-center pb-1">
-                <span className="text-[8px] text-slate-600 uppercase tracking-widest font-extrabold flex items-center gap-1.5">
-                  <CreditCard className="w-3.5 h-3.5 text-gold-600" /> Corporate Payroll Highlight Rules
-                </span>
-                <span className="text-[7.5px] uppercase tracking-widest text-gold-700 font-bold bg-white/80 px-1.5 py-0.5 border border-gold-250 rounded shadow-xs">
-                  {payrollCycleBounds.label}
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-700 leading-relaxed font-medium">
-                Our premium payroll interval opens automatically on the <span className="text-gold-700 font-extrabold">26th of the previous month</span> and cuts off/closes on the <span className="text-gold-700 font-extrabold">25th of the current cycle</span> month.
-              </p>
-
-              {/* Payroll Cycle Switch Selector */}
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gold-200/30 text-[9px] font-bold">
-                <button
-                  onClick={() => setFocusedPayrollCycle('current')}
-                  className={`py-1 rounded text-center cursor-pointer font-mono uppercase tracking-widest border transition-all ${
-                    focusedPayrollCycle === 'current'
-                      ? 'bg-gold-100 border-gold-400 text-gold-800'
-                      : 'border-slate-205 text-slate-500 hover:text-slate-800 hover:bg-white/40'
-                  }`}
-                >
-                  Cycle ending May 25
-                </button>
-                <button
-                  onClick={() => setFocusedPayrollCycle('next')}
-                  className={`py-1 rounded text-center cursor-pointer font-mono uppercase tracking-widest border transition-all ${
-                    focusedPayrollCycle === 'next'
-                      ? 'bg-gold-100 border-gold-400 text-gold-800'
-                      : 'border-slate-205 text-slate-500 hover:text-slate-800 hover:bg-white/40'
-                  }`}
-                >
-                  Cycle opening May 26
-                </button>
-              </div>
-            </div>
-
-            {/* Day of the Week Headers */}
-            <div className="grid grid-cols-7 gap-1 text-center mb-1.5 select-none font-bold">
-              <span className="text-[9px] text-slate-600 uppercase tracking-widest">Su</span>
-              <span className="text-[9px] text-slate-600 uppercase tracking-widest">Mo</span>
-              <span className="text-[9px] text-slate-600 uppercase tracking-widest">Tu</span>
-              <span className="text-[9px] text-slate-600 uppercase tracking-widest">We</span>
-              <span className="text-[9px] text-slate-600 uppercase tracking-widest">Th</span>
-              <span className="text-[9px] text-slate-600 uppercase tracking-widest">Fr</span>
-              <span className="text-[9px] text-gold-700 uppercase tracking-widest">Sa</span>
-            </div>
-
-            {/* Core visual calendar grid displaying local events and Google synchronisations */}
-            <div className="grid grid-cols-7 gap-1.5 flex-1 select-none min-h-[220px]">
-              {calendarDays.map((d, index) => {
-                const isSelected = selectedDateStr === d.dateStr;
-                const dailyEvents = getEventsForDate(d.dateStr);
-
-                // Highlight status based on payroll bounds
-                const fitsCycleInCurrentMonthDisplay = d.isCurrentMonth && isDayInSelectedPayrollCycle(d.dayNumber);
-
-                return (
-                  <div
-                    key={`${d.dateStr}-${index}`}
-                    onClick={() => {
-                      setSelectedDateStr(d.dateStr);
-                      // Auto-populate date in event architect form for seamless UX
-                      setEvDate(d.dateStr);
-                    }}
-                    className={`relative p-2 flex flex-col min-h-[46px] rounded transition-all cursor-pointer ${
-                      d.isCurrentMonth ? 'bg-white border border-slate-200' : 'bg-transparent text-slate-400 border border-transparent'
-                    } ${isSelected ? '!border-gold-500 bg-gold-50/50 shadow-gold-glow' : ''} ${
-                      fitsCycleInCurrentMonthDisplay ? 'payroll-span border-dashed !border-gold-500/30 font-bold' : ''
-                    } hover:border-gold-400 hover:bg-gold-50/20`}
-                  >
-                    {/* Date Number Label */}
-                    <div className="flex justify-between items-center mb-1">
-                      <span
-                        className={`text-[10px] font-mono leading-none font-extrabold ${
-                          d.isCurrentMonth
-                            ? fitsCycleInCurrentMonthDisplay
-                              ? 'text-gold-700'
-                              : 'text-slate-800'
-                            : 'text-slate-400'
-                        }`}
-                      >
-                        {d.dayNumber}
-                      </span>
-
-                      {/* Small visual dot for scheduler roster counts */}
-                      {dailyEvents.length > 0 && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-gold-600 inline-block animate-pulse"></span>
-                      )}
-                    </div>
-
-                    {/* Highly stylized miniature roster badge if events mapped to this container */}
-                    {d.isCurrentMonth && dailyEvents.length > 0 && (
-                      <div className="mt-auto space-y-0.5">
-                        {dailyEvents.slice(0, 2).map((ev) => {
-                          const isGCalImport = ev.id.startsWith('gcal-import');
-                          return (
-                            <div
-                              key={ev.id}
-                              className={`text-[7px] truncate px-1 rounded-sm font-bold tracking-wide leading-tight ${
-                                isGCalImport
-                                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                  : 'bg-gold-50 text-gold-800 border border-gold-200/50'
-                              }`}
-                            >
-                              {ev.title}
-                            </div>
-                          );
-                        })}
-                        {dailyEvents.length > 2 && (
-                          <div className="text-[6.5px] font-mono text-slate-500 text-right font-bold">
-                            +{dailyEvents.length - 2} more
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Dynamic Event detail expanded drawer panel */}
-            <div id="selected_day_drawer" className="mt-4 pt-4 border-t border-slate-200/65 space-y-3.5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-[10px] uppercase tracking-[0.2em] text-slate-905 font-bold">
-                    Roster detail &bull; {selectedDateStr}
-                  </h3>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-[8.5px] font-mono text-gold-700 uppercase tracking-widest font-extrabold">
-                      {selectedDayEvents.length} Active Command Mappings
-                    </span>
-                    {selectedDayEvents.length > 0 && (
-                      <span className="h-3 w-[1px] bg-slate-200"></span>
-                    )}
-                    {selectedDayEvents.length > 0 && (
-                      <span className="text-[8px] font-mono text-slate-500 uppercase tracking-widest italic font-bold">
-                        Payroll Span: {parseInt(selectedDateStr.split('-')[2]) <= 25 ? 'Cycle Apr 26-May 25' : 'Cycle May 26-Jun 25'}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setEvDate(selectedDateStr);
-                    document.getElementById('input_ev_title')?.focus();
-                  }}
-                  className="text-[8.5px] text-slate-600 hover:text-gold-700 border border-slate-350 hover:border-gold-400 px-2.5 py-1 rounded transition-all font-mono uppercase tracking-widest font-bold bg-white"
-                >
-                  + Add Event
-                </button>
-              </div>
-
-              {/* Search and Filter Bar */}
-              {selectedDayEvents.length > 0 && (
-                <div className="flex flex-col sm:flex-row gap-2">
-                  {/* Search Input */}
-                  <div className="relative flex-1">
-                    <input
-                      type="text"
-                      placeholder="Search events..."
-                      value={eventSearchQuery}
-                      onChange={(e) => setEventSearchQuery(e.target.value)}
-                      className="w-full bg-white border border-slate-200 text-[10px] text-slate-900 px-3 py-1.5 pl-7 rounded focus:border-gold-500 focus:outline-none placeholder-slate-400 font-medium"
-                    />
-                    <svg className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                  </div>
-                  {/* Status Filter */}
-                  <select
-                    value={eventStatusFilter}
-                    onChange={(e) => setEventStatusFilter(e.target.value as any)}
-                    className="bg-white border border-slate-200 text-[10px] text-slate-700 px-2 py-1.5 rounded focus:border-gold-500 focus:outline-none font-bold cursor-pointer"
-                  >
-                    <option value="all">All Status</option>
-                    <option value="Confirmed">Confirmed</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Canceled">Canceled</option>
-                  </select>
-                  {/* Clear filters */}
-                  {(eventSearchQuery || eventStatusFilter !== 'all') && (
-                    <button
-                      onClick={() => { setEventSearchQuery(''); setEventStatusFilter('all'); }}
-                      className="text-[8px] text-slate-500 hover:text-red-600 border border-slate-200 hover:border-red-300 px-2 py-1 rounded transition-all font-mono uppercase tracking-widest font-bold bg-white cursor-pointer"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Conflict Warning Banner */}
-              {selectedDayFilteredConflicts.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-bold text-red-800 uppercase tracking-widest">
-                        ⚠ Staff Conflict{selectedDayFilteredConflicts.length > 1 ? 's' : ''} Detected ({selectedDayFilteredConflicts.length})
-                      </p>
-                      <div className="mt-1.5 space-y-1 max-h-[80px] overflow-y-auto">
-                        {selectedDayFilteredConflicts.map((c, idx) => (
-                          <p key={idx} className="text-[8.5px] text-red-700 leading-relaxed">
-                            <span className="font-bold">{c.staffName}</span> ({c.staffRole}) is double-booked:{' '}
-                            <span className="font-mono">"{c.eventA.title}"</span> ({c.eventA.date} {c.eventA.startTime}-{c.eventA.endTime}) ↔{' '}
-                            <span className="font-mono">"{c.eventB.title}"</span> ({c.eventB.date} {c.eventB.startTime}-{c.eventB.endTime})
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Staff Timeline View for selected day */}
-              {selectedDayEvents.length > 0 && (
-                <StaffTimeline
-                  events={events}
-                  staff={staff}
-                  clients={clients}
-                  venues={venues}
-                  selectedDate={selectedDateStr}
-                  onSelectEvent={(eventId) => setSelectedDispatchEventId(eventId)}
-                />
-              )}
-
-              {selectedDayEvents.length === 0 ? (
-                <div className="text-center py-6 text-slate-500 text-xs border border-dashed border-slate-200 bg-white/50 rounded-lg font-medium">
-                  No operational mappings budgeted on this calendar date.
-                </div>
-              ) : (
-                <div className="space-y-3 max-h-[190px] overflow-y-auto pr-1">
-                  {selectedDayEvents
-                    .filter((ev) => {
-                      const matchesSearch = !eventSearchQuery ||
-                        ev.title.toLowerCase().includes(eventSearchQuery.toLowerCase()) ||
-                        ev.notes.toLowerCase().includes(eventSearchQuery.toLowerCase());
-                      const matchesStatus = eventStatusFilter === 'all' || ev.status === eventStatusFilter;
-                      return matchesSearch && matchesStatus;
-                    })
-                    .map((ev) => {
-                    const clientObj = clients.find((c) => c.id === ev.clientId);
-                    const venueObj = venues.find((v) => v.id === ev.venueId);
-                    const isGoogleImport = ev.id.startsWith('gcal-import');
-                    const isAppleImport = ev.id.startsWith('apple-import') || ev.id.startsWith('apple-live');
-
-                    return (
-                      <EventCard
-                        key={ev.id}
-                        ev={ev}
-                        clientObj={clientObj}
-                        venueObj={venueObj}
-                        isGoogleImport={isGoogleImport}
-                        isAppleImport={isAppleImport}
-                        conflictingEventIds={conflictingEventIds}
-                        staff={staff}
-                        showRSVPPanel={showRSVPPanel}
-                        events={events}
-                        selectedDateStr={selectedDateStr}
-                        setShowRSVPPanel={setShowRSVPPanel}
-                        handleQuickStatusChange={handleQuickStatusChange}
-                        handleEditEvent={handleEditEvent}
-                        setShowDeleteConfirm={setShowDeleteConfirm}
-                        setEvents={setEvents}
-                        addActivityLog={addActivityLog}
-                        toggleStaffRSVP={toggleStaffRSVP}
-                        onBulkRSVP={bulkUpdateRSVP}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Double-Shift Visual Auditor & Analytics Breakdown */}
-              {selectedDayEvents.length > 0 && (() => {
-                const approvedDS = selectedDayDoubleShifts.filter(item => 
-                  item.events.every(ev => {
-                    const rsvp = ev.staffRSVPs?.[item.staff.id] || (ev.isDirectBooking ? 'Available' : 'Pending');
-                    return rsvp === 'Available';
-                  })
-                );
-
-                const pendingDS = selectedDayDoubleShifts.filter(item => 
-                  item.events.some(ev => {
-                    const rsvp = ev.staffRSVPs?.[item.staff.id] || (ev.isDirectBooking ? 'Available' : 'Pending');
-                    return rsvp === 'Pending';
-                  })
-                );
-
-                return (
-                  <div className="mt-6 pt-4 border-t border-slate-200/65 space-y-4" id="double_shift_auditor_panel">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="text-[10px] uppercase tracking-[0.2em] text-slate-800 font-display font-bold flex items-center gap-1.5">
-                          <Users className="w-4 h-4 text-gold-600 animate-pulse" /> Double-Shift Audit Engine
-                        </h4>
-                        <p className="text-[8px] text-slate-500 uppercase tracking-widest font-mono mt-0.5">
-                          Breakdown: Approved vs Outstanding on {selectedDateStr}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center space-x-1.5 font-mono text-[8px] font-bold">
-                        <span className="px-2 py-0.5 bg-green-50 text-green-700 border border-green-200/60 rounded">
-                          {approvedDS.length} Approved
-                        </span>
-                        <span className="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200/60 rounded animate-pulse">
-                          {pendingDS.length} Pending
-                        </span>
-                      </div>
-                    </div>
-
-                    {selectedDayDoubleShifts.length === 0 ? (
-                      <p className="text-[9.5px] text-slate-500 italic py-2 bg-slate-50 text-center rounded-md border border-slate-150">
-                        No double shifts detected for this date.
-                      </p>
-                    ) : (
-                      <div className="space-y-2.5">
-                        <p className="text-[8.5px] text-slate-600 font-semibold leading-relaxed">
-                          Vetted staff members assigned to multiple events today. Click check/pending badges to instantly toggle confirmation status.
-                        </p>
-
-                        <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
-                          {selectedDayDoubleShifts.map(({ staff: s, events: evs }) => {
-                            const isFullyApproved = evs.every(ev => {
-                              const rsvp = ev.staffRSVPs?.[s.id] || (ev.isDirectBooking ? 'Available' : 'Pending');
-                              return rsvp === 'Available';
-                            });
-
-                            return (
-                              <div
-                                key={s.id}
-                                className={`p-2.5 border rounded-md transition-all ${
-                                  isFullyApproved
-                                    ? 'border-green-200 bg-green-50/25'
-                                    : 'border-amber-200 bg-amber-50/25 font-bold'
-                                }`}
-                              >
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center space-x-2">
-                                    <span className="text-xs font-bold text-slate-900">
-                                      {s.name} {s.surname}
-                                    </span>
-                                    <span className="text-[7.5px] uppercase tracking-widest px-1.5 py-0.5 bg-gold-50 text-gold-700 rounded-sm italic border border-gold-200/40 font-bold">
-                                      {s.role}
-                                    </span>
-                                  </div>
-
-                                  <span className={`text-[7.5px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded border font-bold ${
-                                    isFullyApproved
-                                      ? 'bg-green-100 border-green-300 text-green-800'
-                                      : 'bg-amber-100 border-amber-300 text-amber-800'
-                                  }`}>
-                                    {isFullyApproved ? 'All Approved' : 'Action Required'}
-                                  </span>
-                                </div>
-
-                                <div className="space-y-1">
-                                  {evs.map((evItem) => {
-                                    const rsvpState = evItem.staffRSVPs?.[s.id] || (evItem.isDirectBooking ? 'Available' : 'Pending');
-                                    return (
-                                      <div
-                                        key={evItem.id}
-                                        className="flex items-center justify-between text-[9px] bg-white border border-slate-150 rounded px-2 py-1"
-                                      >
-                                        <div className="truncate max-w-[65%] font-medium">
-                                          <span className="font-extrabold text-slate-800">{evItem.title}</span>
-                                          <span className="text-slate-500 font-mono text-[8.5px] block">{evItem.startTime} - {evItem.endTime}</span>
-                                        </div>
-
-                                        <button
-                                          onClick={() => toggleStaffRSVP(evItem.id, s.id)}
-                                          className={`text-[7.5px] font-mono uppercase tracking-wider px-2 py-0.5 rounded border cursor-pointer transition-all font-bold ${
-                                            rsvpState === 'Available'
-                                              ? 'bg-green-50 hover:bg-green-100 border-green-200 text-green-700 font-bold'
-                                              : 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700 font-bold'
-                                          }`}
-                                        >
-                                          {rsvpState === 'Available' ? '✓ Approved' : '⌛ Pending'}
-                                        </button>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-
-          </div>
-
-        </section>
+        <PayrollCalendar
+          events={events}
+          googleEvents={googleEvents}
+          appleEvents={appleEvents}
+          appleUser={appleUser}
+          clients={clients}
+          venues={venues}
+          staff={staff}
+          currentMonth={currentMonth}
+          currentYear={currentYear}
+          setCurrentMonth={setCurrentMonth}
+          setCurrentYear={setCurrentYear}
+          selectedDateStr={selectedDateStr}
+          setSelectedDateStr={setSelectedDateStr}
+          focusedPayrollCycle={focusedPayrollCycle}
+          setFocusedPayrollCycle={setFocusedPayrollCycle}
+          setEvDate={setEvDate}
+          showRSVPPanel={showRSVPPanel}
+          setShowRSVPPanel={setShowRSVPPanel}
+          toggleStaffRSVP={toggleStaffRSVP}
+          handleQuickStatusChange={handleQuickStatusChange}
+          handleEditEvent={handleEditEvent}
+          setShowDeleteConfirm={setShowDeleteConfirm}
+          setEvents={setEvents}
+          addActivityLog={addActivityLog}
+          bulkUpdateRSVP={bulkUpdateRSVP}
+          getMatchedClientAndVenue={getMatchedClientAndVenue}
+        />
 
         {/* ========================================================================= */}
         {/* RIGHT COLUMN: WhatsApp Dispatcher Console, Apple Sync & Call Log       */}
