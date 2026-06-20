@@ -11,15 +11,12 @@ import {
   CalendarDays,
   User,
   Users,
-  CreditCard,
   ChevronLeft,
   ChevronRight,
   Radio,
   PhoneForwarded,
-  ScrollText,
   X,
   CheckCircle,
-  Download,
   AlertCircle,
   Briefcase,
   RefreshCw,
@@ -54,6 +51,7 @@ import PayrollCalendar from './components/PayrollCalendar';
 import RegistrationModals from './components/RegistrationModals';
 import DialogsModals from './components/DialogsModals';
 import StaffAvailabilityPanel from './components/StaffAvailabilityPanel';
+import ExportToolbar from './components/ExportToolbar';
 
 const RoleChart = lazy(() => import('./components/RoleChart'));
 const StaffShiftCalendar = lazy(() => import('./components/StaffShiftCalendar'));
@@ -2882,6 +2880,76 @@ export default function App() {
     showToast(`Backup exported: ${events.length} events, ${clients.length} clients, ${staff.length} staff, ${venues.length} venues.`, 'success');
   };
 
+  // JSON Data Backup Importer
+  const handleImportBackup = (data: any, mode: 'replace' | 'merge') => {
+    const importDate = new Date(data.exportDate).toLocaleString();
+    let importedEvents = 0;
+    let importedClients = 0;
+    let importedVenues = 0;
+    let importedStaff = 0;
+
+    if (mode === 'replace') {
+      // Replace all data
+      setEvents(data.events || []);
+      setClients(data.clients || []);
+      setVenues(data.venues || []);
+      setStaff(data.staff || []);
+      if (data.activityLogs) setActivityLogs(data.activityLogs);
+
+      localStorage.setItem('fp_events', JSON.stringify(data.events || []));
+      localStorage.setItem('fp_clients', JSON.stringify(data.clients || []));
+      localStorage.setItem('fp_venues', JSON.stringify(data.venues || []));
+      localStorage.setItem('fp_staff', JSON.stringify(data.staff || []));
+      if (data.activityLogs) localStorage.setItem('fp_logs', JSON.stringify(data.activityLogs));
+
+      importedEvents = (data.events || []).length;
+      importedClients = (data.clients || []).length;
+      importedVenues = (data.venues || []).length;
+      importedStaff = (data.staff || []).length;
+
+      addActivityLog('sync', `Full data REPLACE import from backup (${importDate}): ${importedEvents} events, ${importedClients} clients, ${importedVenues} venues, ${importedStaff} staff.`);
+      showToast(`Import complete: ${importedEvents} events, ${importedClients} clients, ${importedVenues} venues, ${importedStaff} staff replaced.`, 'success');
+    } else {
+      // Merge mode: add only new records (by ID)
+      const existingEventIds = new Set(events.map(e => e.id));
+      const existingClientIds = new Set(clients.map(c => c.id));
+      const existingVenueIds = new Set(venues.map(v => v.id));
+      const existingStaffIds = new Set(staff.map(s => s.id));
+
+      const newEvents = (data.events || []).filter((e: any) => !existingEventIds.has(e.id));
+      const newClients = (data.clients || []).filter((c: any) => !existingClientIds.has(c.id));
+      const newVenues = (data.venues || []).filter((v: any) => !existingVenueIds.has(v.id));
+      const newStaff = (data.staff || []).filter((s: any) => !existingStaffIds.has(s.id));
+
+      const mergedEvents = [...events, ...newEvents];
+      const mergedClients = [...clients, ...newClients];
+      const mergedVenues = [...venues, ...newVenues];
+      const mergedStaff = [...staff, ...newStaff];
+
+      setEvents(mergedEvents);
+      setClients(mergedClients);
+      setVenues(mergedVenues);
+      setStaff(mergedStaff);
+
+      localStorage.setItem('fp_events', JSON.stringify(mergedEvents));
+      localStorage.setItem('fp_clients', JSON.stringify(mergedClients));
+      localStorage.setItem('fp_venues', JSON.stringify(mergedVenues));
+      localStorage.setItem('fp_staff', JSON.stringify(mergedStaff));
+
+      importedEvents = newEvents.length;
+      importedClients = newClients.length;
+      importedVenues = newVenues.length;
+      importedStaff = newStaff.length;
+
+      addActivityLog('sync', `Merged data from backup (${importDate}): +${importedEvents} events, +${importedClients} clients, +${importedVenues} venues, +${importedStaff} staff added.`);
+      showToast(`Merge complete: +${importedEvents} events, +${importedClients} clients, +${importedVenues} venues, +${importedStaff} staff added.`, 'success');
+
+      if (importedEvents === 0 && importedClients === 0 && importedVenues === 0 && importedStaff === 0) {
+        showToast('No new records found in backup — all IDs already exist.', 'info');
+      }
+    }
+  };
+
   // Authenticated Gateway form render
   if (!isUnlocked) {
     return (
@@ -3170,42 +3238,13 @@ export default function App() {
       </header>
 
       {/* Premium Quiet Luxury Operational Export Control Panel */}
-      <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-6 select-none" id="export_control_toolbar">
-        <div className="p-4 rounded-lg border border-gold-300/30 bg-white/95 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-3">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 rounded bg-gold-50 border border-gold-300/30">
-              <Download className="w-4 h-4 text-gold-600 animate-bounce" />
-            </div>
-            <div>
-              <h3 className="text-[10px] uppercase font-display tracking-[0.2em] text-slate-905 font-bold">Operational Export Controls</h3>
-              <p className="text-[8px] uppercase tracking-widest text-slate-500 font-mono mt-0.5">Secure CSV Ledger Spreads &bull; Ready for Audit Logs</p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
-            <button
-              onClick={handleExportEventsCSV}
-              id="export_events_csv_trigger"
-              className="py-1.5 px-3.5 border border-slate-205 hover:border-gold-500/30 text-slate-800 font-mono text-[9px] uppercase tracking-widest hover:bg-gold-50 transition-all rounded flex items-center gap-1.5 cursor-pointer font-semibold"
-            >
-              <ScrollText className="w-3 h-3 text-gold-600" /> Export Events (.CSV)
-            </button>
-            <button
-              onClick={handleExportPayrollCSV}
-              id="export_payroll_csv_trigger"
-              className="py-1.5 px-3.5 border border-gold-300/30 text-gold-800 font-mono text-[9px] uppercase tracking-widest hover:bg-gold-50 transition-all rounded flex items-center gap-1.5 cursor-pointer font-bold bg-gold-50/50"
-            >
-              <CreditCard className="w-3 h-3 text-gold-600" /> Export Payroll &bull; {payrollCycleBounds.label} (.CSV)
-            </button>
-            <button
-              onClick={handleExportJSON}
-              id="export_json_backup_trigger"
-              className="py-1.5 px-3.5 border border-blue-200 hover:border-blue-400 text-blue-700 font-mono text-[9px] uppercase tracking-widest hover:bg-blue-50 transition-all rounded flex items-center gap-1.5 cursor-pointer font-bold bg-blue-50/50"
-            >
-              <Download className="w-3 h-3 text-blue-600" /> Full Backup (.JSON)
-            </button>
-          </div>
-        </div>
-      </section>
+      <ExportToolbar
+        payrollCycleBounds={payrollCycleBounds}
+        handleExportEventsCSV={handleExportEventsCSV}
+        handleExportPayrollCSV={handleExportPayrollCSV}
+        handleExportJSON={handleExportJSON}
+        onImportBackup={handleImportBackup}
+      />
 
       {/* Mobile menu overlay backdrop */}
       {mobileMenuOpen && (
