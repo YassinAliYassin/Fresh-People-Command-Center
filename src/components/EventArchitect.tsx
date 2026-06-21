@@ -184,6 +184,37 @@ const EventArchitect: React.FC<EventArchitectProps> = ({
               required
               className="w-full bg-white border border-slate-300 text-xs text-slate-900 px-2.5 py-1.5 rounded focus:border-gold-500 focus:outline-hidden font-mono font-bold"
             />
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={() => setEvDate(new Date().toISOString().split('T')[0])}
+                className="flex-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 hover:bg-gold-100 hover:text-gold-700 transition-colors border border-slate-200"
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const t = new Date();
+                  t.setDate(t.getDate() + 1);
+                  setEvDate(t.toISOString().split('T')[0]);
+                }}
+                className="flex-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 hover:bg-gold-100 hover:text-gold-700 transition-colors border border-slate-200"
+              >
+                Tomorrow
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const w = new Date();
+                  w.setDate(w.getDate() + 7);
+                  setEvDate(w.toISOString().split('T')[0]);
+                }}
+                className="flex-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 hover:bg-gold-100 hover:text-gold-700 transition-colors border border-slate-200"
+              >
+                +1 Week
+              </button>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-1">
             <div className="space-y-1">
