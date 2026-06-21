@@ -59,6 +59,7 @@ export interface PayrollCalendarProps {
   addActivityLog: (type: string, message: string, urgent?: boolean) => void;
   bulkUpdateRSVP: (eventId: string, state: 'Available' | 'Unavailable') => void;
   getMatchedClientAndVenue: (title: string, clientId?: string, venueId?: string) => { clientId: string; venueId: string };
+  handleDuplicateEvent: (event: Event) => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -117,6 +118,7 @@ const PayrollCalendar: React.FC<PayrollCalendarProps> = ({
   addActivityLog,
   bulkUpdateRSVP,
   getMatchedClientAndVenue,
+  handleDuplicateEvent,
 }) => {
   // ── Local state ──────────────────────────────────────────────────────────
   const [eventSearchQuery, setEventSearchQuery] = useState('');
@@ -609,6 +611,7 @@ const PayrollCalendar: React.FC<PayrollCalendarProps> = ({
                       addActivityLog={addActivityLog}
                       toggleStaffRSVP={toggleStaffRSVP}
                       onBulkRSVP={bulkUpdateRSVP}
+                      onDuplicateEvent={handleDuplicateEvent}
                     />
                   );
                 })}

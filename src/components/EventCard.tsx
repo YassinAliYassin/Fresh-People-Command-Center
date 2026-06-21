@@ -27,6 +27,7 @@ export interface EventCardProps {
   addActivityLog: (type: ActivityLog['type'], message: string) => void;
   toggleStaffRSVP: (eventId: string, staffId: string) => void;
   onBulkRSVP?: (eventId: string, state: 'Available' | 'Unavailable') => void;
+  onDuplicateEvent?: (event: Event) => void;
 }
 
 export function EventCard(props: EventCardProps & { key?: React.Key }) {
@@ -47,6 +48,7 @@ export function EventCard(props: EventCardProps & { key?: React.Key }) {
     setEvents,
     addActivityLog,
     onBulkRSVP,
+    onDuplicateEvent,
   } = props;
   const updateStaffRSVP = (sId: string, newState: 'Available' | 'Pending' | 'Unavailable') => {
     const sObj = staff.find((s) => s.id === sId);
@@ -185,6 +187,14 @@ export function EventCard(props: EventCardProps & { key?: React.Key }) {
                 className="text-[8.5px] text-gold-700 hover:text-gold-600 hover:underline transition-all font-mono font-bold cursor-pointer"
               >
                 Edit
+              </button>
+              <span className="text-slate-300">|</span>
+              <button
+                onClick={() => onDuplicateEvent?.(ev)}
+                className="text-[8.5px] text-violet-600 hover:text-violet-500 hover:underline transition-all font-mono font-bold cursor-pointer"
+                title="Duplicate this event"
+              >
+                Duplicate
               </button>
               <span className="text-slate-300">|</span>
               <button
