@@ -46,6 +46,7 @@ import ExportToolbar from './components/ExportToolbar';
 import AuthGateway from './components/AuthGateway';
 import AppHeader from './components/AppHeader';
 import ToastNotifications from './components/ToastNotifications';
+import StaffingAlertsPanel from './components/StaffingAlertsPanel';
 
 const RoleChart = lazy(() => import('./components/RoleChart'));
 const StaffShiftCalendar = lazy(() => import('./components/StaffShiftCalendar'));
@@ -3034,6 +3035,14 @@ export default function App() {
             onAddClient={() => setActiveModal('client')}
             onAddVenue={() => setActiveModal('venue')}
             onAddStaff={() => setActiveModal('staff')}
+          />
+
+          {/* Staffing Alerts Panel */}
+          <StaffingAlertsPanel
+            events={events}
+            staff={staff}
+            clients={clients}
+            venues={venues}
           />
 
           {/* Staff Availability Dashboard */}
