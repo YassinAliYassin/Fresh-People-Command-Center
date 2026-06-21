@@ -200,13 +200,13 @@ export default function StaffingAlertsPanel({ events, staff, clients, venues }: 
 
   if (alerts.length === 0) {
     return (
-      <div className="glass-panel rounded-lg p-5 shadow-luxury-glow">
-        <span className="text-[10px] uppercase tracking-[0.2em] text-slate-800 font-display flex items-center gap-1.5 mb-3 border-b border-slate-205 pb-2 font-bold select-none">
+      <div className="glass-panel rounded-lg p-4 sm:p-5 shadow-luxury-glow">
+        <span className="text-xs sm:text-[10px] uppercase tracking-[0.2em] text-slate-800 font-display flex items-center gap-1.5 mb-3 border-b border-slate-205 pb-2 font-bold select-none">
           <Bell className="w-4 h-4 text-gold-600" /> Staffing Alerts
         </span>
         <div className="flex flex-col items-center justify-center py-6 gap-2">
           <CheckCircle2 className="w-8 h-8 text-emerald-400" />
-          <p className="text-[10px] text-slate-500 font-semibold">All clear — no staffing issues detected</p>
+          <p className="text-xs sm:text-[10px] text-slate-500 font-semibold">All clear — no staffing issues detected</p>
         </div>
       </div>
     );
@@ -221,23 +221,23 @@ export default function StaffingAlertsPanel({ events, staff, clients, venues }: 
       <div className="space-y-1.5">
         <button
           onClick={() => toggleCategory(type)}
-          className="w-full flex items-center justify-between py-1.5 px-2 rounded hover:bg-slate-50 transition-colors cursor-pointer"
+          className="w-full flex items-center justify-between py-2 sm:py-1.5 px-2 rounded hover:bg-slate-50 transition-colors cursor-pointer"
         >
           <div className="flex items-center gap-1.5">
             {icon}
-            <span className={`text-[9px] uppercase tracking-wider font-bold ${colorClass}`}>{label}</span>
-            <span className={`text-[8px] font-mono font-bold px-1.5 py-0.5 rounded-full ${colorClass} bg-opacity-10 ${type === 'critical' ? 'bg-red-100' : type === 'warning' ? 'bg-amber-100' : 'bg-blue-100'}`}>
+            <span className="text-[10px] sm:text-[9px] uppercase tracking-wider font-bold">{label}</span>
+            <span className="text-[9px] sm:text-[8px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-opacity-10">
               {count}
             </span>
           </div>
-          {isExpanded ? <ChevronUp className="w-3 h-3 text-slate-400" /> : <ChevronDown className="w-3 h-3 text-slate-400" />}
+          {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
         </button>
         {isExpanded && (
-          <div className="space-y-1 pl-1">
+          <div className="space-y-1.5 sm:space-y-1 pl-1">
             {categoryAlerts.map(alert => (
               <div
                 key={alert.id}
-                className={`p-2.5 rounded-lg border text-left ${
+                className={`p-3 sm:p-2.5 rounded-lg border text-left ${
                   type === 'critical'
                     ? 'bg-red-50/80 border-red-200'
                     : type === 'warning'
@@ -247,25 +247,25 @@ export default function StaffingAlertsPanel({ events, staff, clients, venues }: 
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      {alert.category === 'unstaffed' && <UserX className="w-3 h-3 text-red-500 shrink-0" />}
-                      {alert.category === 'pending_rsvp' && <Clock className="w-3 h-3 text-amber-500 shrink-0" />}
-                      {alert.category === 'conflict' && <ShieldAlert className="w-3 h-3 text-red-500 shrink-0" />}
-                      {alert.category === 'upcoming_48h' && <Calendar className="w-3 h-3 text-red-500 shrink-0" />}
-                      {alert.category === 'canceled_active' && <AlertCircle className="w-3 h-3 text-blue-500 shrink-0" />}
-                      <span className="text-[9px] font-bold text-slate-800 truncate">{alert.title}</span>
+                    <div className="flex items-center gap-1.5 mb-1 sm:mb-0.5">
+                      {alert.category === 'unstaffed' && <UserX className="w-3.5 h-3.5 sm:w-3 sm:h-3 text-red-500 shrink-0" />}
+                      {alert.category === 'pending_rsvp' && <Clock className="w-3.5 h-3.5 sm:w-3 sm:h-3 text-amber-500 shrink-0" />}
+                      {alert.category === 'conflict' && <ShieldAlert className="w-3.5 h-3.5 sm:w-3 sm:h-3 text-red-500 shrink-0" />}
+                      {alert.category === 'upcoming_48h' && <Calendar className="w-3.5 h-3.5 sm:w-3 sm:h-3 text-red-500 shrink-0" />}
+                      {alert.category === 'canceled_active' && <AlertCircle className="w-3.5 h-3.5 sm:w-3 sm:h-3 text-blue-500 shrink-0" />}
+                      <span className="text-[10px] sm:text-[9px] font-bold text-slate-800 truncate">{alert.title}</span>
                     </div>
-                    <p className="text-[8px] text-slate-600 leading-relaxed">{alert.description}</p>
+                    <p className="text-[9px] sm:text-[8px] text-slate-600 leading-relaxed">{alert.description}</p>
                     {alert.eventDate && (
-                      <span className="text-[7px] text-slate-400 font-mono mt-0.5 block">{alert.eventDate}</span>
+                      <span className="text-[8px] sm:text-[7px] text-slate-400 font-mono mt-0.5 block">{alert.eventDate}</span>
                     )}
                   </div>
                   <button
                     onClick={() => dismissAlert(alert.id)}
-                    className="p-0.5 hover:bg-white/60 rounded transition-colors cursor-pointer shrink-0"
+                    className="p-1.5 sm:p-0.5 hover:bg-white/60 rounded transition-colors cursor-pointer shrink-0 min-w-[32px] min-h-[32px] sm:min-w-0 sm:min-h-0 flex items-center justify-center"
                     title="Dismiss"
                   >
-                    <X className="w-3 h-3 text-slate-400" />
+                    <X className="w-4 h-4 sm:w-3 sm:h-3 text-slate-400" />
                   </button>
                 </div>
               </div>
@@ -277,26 +277,26 @@ export default function StaffingAlertsPanel({ events, staff, clients, venues }: 
   };
 
   return (
-    <div className="glass-panel rounded-lg p-5 shadow-luxury-glow">
+    <div className="glass-panel rounded-lg p-4 sm:p-5 shadow-luxury-glow">
       <div className="flex items-center justify-between mb-3 border-b border-slate-205 pb-2">
-        <span className="text-[10px] uppercase tracking-[0.2em] text-slate-800 font-display flex items-center gap-1.5 font-bold select-none">
+        <span className="text-xs sm:text-[10px] uppercase tracking-[0.2em] text-slate-800 font-display flex items-center gap-1.5 font-bold select-none">
           <Bell className="w-4 h-4 text-gold-600" /> Staffing Alerts
         </span>
         <div className="flex items-center gap-2">
           {criticalCount > 0 && (
-            <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700">
+            <span className="text-[9px] sm:text-[8px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700">
               {criticalCount} critical
             </span>
           )}
           {warningCount > 0 && (
-            <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
+            <span className="text-[9px] sm:text-[8px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
               {warningCount} warning
             </span>
           )}
           {activeAlerts.length > 0 && (
             <button
               onClick={dismissAll}
-              className="text-[7px] text-slate-400 hover:text-slate-600 font-mono uppercase tracking-wider cursor-pointer"
+              className="text-[8px] sm:text-[7px] text-slate-400 hover:text-slate-600 font-mono uppercase tracking-wider cursor-pointer px-1 py-0.5"
             >
               Dismiss all
             </button>
@@ -304,16 +304,16 @@ export default function StaffingAlertsPanel({ events, staff, clients, venues }: 
         </div>
       </div>
 
-      <div className="space-y-2 max-h-[400px] overflow-y-auto">
-        {renderCategorySection('critical', <AlertTriangle className="w-3.5 h-3.5 text-red-500" />, 'Critical', criticalCount, 'text-red-700')}
-        {renderCategorySection('warning', <AlertCircle className="w-3.5 h-3.5 text-amber-500" />, 'Warnings', warningCount, 'text-amber-700')}
-        {renderCategorySection('info', <AlertCircle className="w-3.5 h-3.5 text-blue-500" />, 'Info', infoCount, 'text-blue-700')}
+      <div className="space-y-2 max-h-[500px] sm:max-h-[400px] overflow-y-auto overscroll-contain">
+        {renderCategorySection('critical', <AlertTriangle className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-red-500" />, 'Critical', criticalCount, 'text-red-700')}
+        {renderCategorySection('warning', <AlertCircle className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-amber-500" />, 'Warnings', warningCount, 'text-amber-700')}
+        {renderCategorySection('info', <AlertCircle className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-blue-500" />, 'Info', infoCount, 'text-blue-700')}
       </div>
 
       {activeAlerts.length === 0 && (
         <div className="flex flex-col items-center justify-center py-4 gap-2">
           <CheckCircle2 className="w-6 h-6 text-emerald-400" />
-          <p className="text-[9px] text-slate-500 font-semibold">All alerts dismissed</p>
+          <p className="text-xs sm:text-[9px] text-slate-500 font-semibold">All alerts dismissed</p>
         </div>
       )}
     </div>

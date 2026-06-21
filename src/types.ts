@@ -48,6 +48,10 @@ export interface Event {
   status?: 'Pending' | 'Confirmed' | 'Canceled';
   isDirectBooking?: boolean; // If booked directly on the spot
   staffRSVPs?: Record<string, 'Pending' | 'Available' | 'Unavailable'>; // Tracking responses per staff member
+  recurrence?: 'none' | 'weekly' | 'biweekly' | 'monthly'; // Recurrence pattern for recurring events
+  recurrenceEnd?: string; // YYYY-MM-DD — date to stop recurrence
+  isRecurrenceInstance?: boolean; // True if this was auto-generated from a recurrence
+  originalEventId?: string; // Reference to the parent event if this is a recurrence instance
 }
 
 export interface EventTemplate {

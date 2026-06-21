@@ -692,6 +692,8 @@ export default function App() {
   const [evClientRequirements, setEvClientRequirements] = useState('');
   const [evSelectedStaffIds, setEvSelectedStaffIds] = useState<string[]>([]);
   const [evStatus, setEvStatus] = useState<'Pending' | 'Confirmed' | 'Canceled'>('Pending');
+  const [recurrence, setRecurrence] = useState<'none' | 'weekly' | 'biweekly' | 'monthly'>('none');
+  const [recurrenceEnd, setRecurrenceEnd] = useState('');
 
   // Edit mode state
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -2649,6 +2651,10 @@ export default function App() {
             clients={clients}
             venues={venues}
             staff={staff}
+            recurrence={recurrence}
+            setRecurrence={setRecurrence}
+            recurrenceEnd={recurrenceEnd}
+            setRecurrenceEnd={setRecurrenceEnd}
             createEvent={createEvent}
             toggleStaffAllocation={toggleStaffAllocation}
             saveEventTemplate={saveEventTemplate}

@@ -46,6 +46,11 @@ export interface EventArchitectProps {
   clients: Client[];
   venues: Venue[];
   staff: Staff[];
+  // Recurrence
+  recurrence: 'none' | 'weekly' | 'biweekly' | 'monthly';
+  setRecurrence: (v: 'none' | 'weekly' | 'biweekly' | 'monthly') => void;
+  recurrenceEnd: string;
+  setRecurrenceEnd: (v: string) => void;
   // Callbacks
   createEvent: (e: React.FormEvent) => void;
   toggleStaffAllocation: (staffId: string) => void;
@@ -71,6 +76,7 @@ const EventArchitect: React.FC<EventArchitectProps> = ({
   templateName, setTemplateName,
   eventTemplates,
   clients, venues, staff,
+  recurrence, setRecurrence, recurrenceEnd, setRecurrenceEnd,
   createEvent, toggleStaffAllocation,
   saveEventTemplate, applyEventTemplate, deleteEventTemplate,
 }) => {
@@ -255,6 +261,38 @@ const EventArchitect: React.FC<EventArchitectProps> = ({
             <option value="Confirmed" className="bg-white text-slate-900">✅ Confirmed</option>
             <option value="Canceled" className="bg-white text-slate-900">❌ Canceled</option>
           </select>
+        </div>
+
+        {/* Event Recurrence */}
+        <div className="space-y-1">
+          <label htmlFor="select_ev_recurrence" className="text-[8px] text-slate-505 uppercase tracking-widest block font-bold">Recurrence</label>
+          <div className="flex gap-2">
+            <select
+              id="select_ev_recurrence"
+              value={recurrence}
+              onChange={(e) => setRecurrence(e.target.value as 'none' | 'weekly' | 'biweekly' | 'monthly')}
+              className="flex-1 bg-white border border-slate-300 text-xs text-slate-900 px-2 py-2 rounded focus:border-gold-500 focus:outline-hidden cursor-pointer font-bold"
+            >
+              <option value="none" className="bg-white text-slate-900">No Recurrence</option>
+              <option value="weekly" className="bg-white text-slate-900">🔁 Weekly</option>
+              <option value="biweekly" className="bg-white text-slate-900">🔁 Biweekly</option>
+              <option value="monthly" className="bg-white text-slate-900">🔁 Monthly</option>
+            </select>
+            {recurrence !== 'none' && (
+              <input
+                type="date"
+                value={recurrenceEnd}
+                onChange={(e) => setRecurrenceEnd(e.target.value)}
+                className="w-32 bg-white border border-slate-300 text-[10px] text-slate-900 px-2 py-2 rounded focus:border-gold-500 focus:outline-hidden font-mono"
+                title="Recurrence end date"
+              />
+            )}
+          </div>
+          {recurrence !== 'none' && (
+            <p className="text-[8px] text-slate-500 italic">
+              Repeats {recurrence} until {recurrenceEnd || 'no end date set'} — edit individual instances to break the pattern.
+            </p>
+          )}
         </div>
 
         {/* Direct Booking Manual Setup */}
