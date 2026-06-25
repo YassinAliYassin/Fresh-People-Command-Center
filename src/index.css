@@ -100,6 +100,51 @@ body {
   border: 1px dashed rgba(191, 143, 59, 0.35) !important;
 }
 
+/* Premium gradient overlays for hero sections */
+.hero-gradient {
+  background: linear-gradient(135deg, #FAF9F6 0%, #F7F5F0 50%, #F5F3EB 100%);
+}
+
+.gold-accent {
+  background: linear-gradient(135deg, #BF8F3B 0%, #A4742E 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Enhanced card hover effects */
+.card-hover {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(164, 116, 46, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+/* Animated loading dots */
+.loading-dots::after {
+  content: '';
+  animation: dots 1.5s infinite;
+}
+
+@keyframes dots {
+  0% { content: '.'; }
+  33% { content: '..'; }
+  66% { content: '...'; }
+  100% { content: '.'; }
+}
+
+/* Status indicator pulsing */
+.status-active {
+  animation: pulse-status 2s infinite;
+}
+
+@keyframes pulse-status {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(191, 143, 59, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(191, 143, 59, 0); }
+}
+
 /* Standard animation transitions */
 .fade-in-up {
   animation: scaleUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
