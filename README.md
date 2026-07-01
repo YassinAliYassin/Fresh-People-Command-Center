@@ -1,4 +1,4 @@
-# Fresh People Command Center
+# Events Staffing Command Center
 
 > Events Staffing Operations Management System
 
